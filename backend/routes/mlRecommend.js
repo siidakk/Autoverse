@@ -3,7 +3,11 @@ const express = require("express")
 const axios = require("axios")
 
 const router = express.Router()
-const mlApiUrl = (process.env.ML_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "")
+const mlApiUrl = (
+  process.env.ML_API_URL ||
+  (process.env.ML_API_HOSTPORT && `http://${process.env.ML_API_HOSTPORT}`) ||
+  "http://127.0.0.1:8000"
+).replace(/\/$/, "")
 
 router.post("/", async (req, res) => {
 

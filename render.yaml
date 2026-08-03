@@ -20,5 +20,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: ML_API_URL
-        sync: false
+      - key: ML_API_HOSTPORT
+        fromService:
+          type: web
+          name: autoverse-ml
+          property: hostport
