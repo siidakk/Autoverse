@@ -6,23 +6,35 @@ import pandas as pd
 
 import joblib
 
+import os
+
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+
 # LOAD MODEL
 
 model = joblib.load(
-    "car_recommendation_model.pkl"
+    BASE_DIR / "car_recommendation_model.pkl"
 )
 
 encoders = joblib.load(
-    "encoders.pkl"
+    BASE_DIR / "encoders.pkl"
 )
 
 df = joblib.load(
-    "processed_cars.pkl"
+    BASE_DIR / "processed_cars.pkl"
 )
 
 app = Flask(__name__)
 
 CORS(app)
+
+@app.route("/health", methods=["GET"])
+
+def health():
+
+    return jsonify({"status": "ok"})
 
 @app.route("/recommend", methods=["POST"])
 
@@ -115,15 +127,16 @@ def recommend():
             "price": row["MSRP"]
 
         })
-        
+
 
     return jsonify(result)
 
 if __name__ == "__main__":
 
     app.run(
-        port=8000,
-        debug=True
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 8000)),
+        debug=False
     )
 
     

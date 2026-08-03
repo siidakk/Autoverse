@@ -4,6 +4,7 @@ const cors = require("cors")
 require("dotenv").config()
 
 const app = express()
+const mongoUri = process.env.MONGO_URI
 
 app.use(cors())
 app.use(express.json())
@@ -12,13 +13,21 @@ app.get("/", (req, res) => {
   res.send("AutoVerse Backend Running")
 })
 
-mongoose.connect(process.env.MONGO_URI)
-.then(() => {
-  console.log("MongoDB Connected")
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" })
 })
-.catch((err) => {
-  console.log(err)
-})
+
+if (mongoUri) {
+  mongoose.connect(mongoUri)
+    .then(() => {
+      console.log("MongoDB Connected")
+    })
+    .catch((err) => {
+      console.error("MongoDB connection failed", err)
+    })
+} else {
+  console.warn("MONGO_URI is not configured; continuing without MongoDB")
+}
 
 const PORT = process.env.PORT || 5000
 

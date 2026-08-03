@@ -3,6 +3,7 @@ const express = require("express")
 const axios = require("axios")
 
 const router = express.Router()
+const mlApiUrl = (process.env.ML_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "")
 
 router.post("/", async (req, res) => {
 
@@ -10,9 +11,11 @@ router.post("/", async (req, res) => {
 
     const response = await axios.post(
 
-      "http://127.0.0.1:8000/recommend",
+      `${mlApiUrl}/recommend`,
 
-      req.body
+      req.body,
+
+      { timeout: 15000 }
 
     )
 
@@ -22,11 +25,11 @@ router.post("/", async (req, res) => {
 
   catch (error) {
 
-    console.log(error)
+    console.error("ML API request failed", error.message)
 
-    res.status(500).json({
+    res.status(502).json({
 
-      message: "ML API Error"
+      message: "Recommendation service is unavailable"
 
     })
 
