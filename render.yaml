@@ -2,6 +2,7 @@ services:
   - type: web
     name: autoverse-ml
     runtime: python
+    plan: free
     rootDir: ml
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn --bind 0.0.0.0:$PORT app:app
@@ -13,6 +14,7 @@ services:
   - type: web
     name: autoverse-api
     runtime: node
+    plan: free
     rootDir: backend
     buildCommand: npm ci
     startCommand: npm start
