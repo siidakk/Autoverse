@@ -2,6 +2,9 @@ import { useState } from "react"
 
 import axios from "axios"
 
+const apiBaseUrl = (import.meta.env.VITE_API_URL || "http://localhost:5000")
+  .replace(/\/$/, "")
+
 function MLPanel() {
 
   const [horsepower, setHorsepower] =
@@ -34,7 +37,7 @@ function MLPanel() {
 
       const response = await axios.post(
 
-        "http://localhost:5000/ml",
+        `${apiBaseUrl}/ml`,
 
         {
 
