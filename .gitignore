@@ -1,0 +1,23 @@
+# Dependencies and generated builds
+node_modules/
+dist/
+coverage/
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Logs and operating-system/editor files
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
