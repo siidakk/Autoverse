@@ -1,5 +1,6 @@
-import { Suspense } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Suspense, useEffect, useRef } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import * as THREE from "three";
 import {
   OrbitControls,
   Environment,
@@ -8,6 +9,7 @@ import {
   MeshReflectorMaterial
 } from "@react-three/drei";
 import CarModel from "./CarModel";
+import { CAMERA_VIEWS } from "../data/views";
 
 // Studio softboxes built in code rather than an HDR file, so the showroom needs
 // no extra assets and still gives the paint something to reflect.
@@ -73,7 +75,43 @@ function ShowroomFloor() {
   );
 }
 
-export default function CarViewer({ car, color, paint, wheelType, spoilerType }) {
+// Glides the camera to a preset instead of snapping, and hands control straight
+// back so the user can keep dragging.
+function CameraRig({ view, controls }) {
+  const { camera } = useThree();
+  const target = useRef(null);
+
+  useEffect(() => {
+    const preset = CAMERA_VIEWS.find((entry) => entry.id === view);
+    target.current = preset ? new THREE.Vector3(...preset.position) : null;
+  }, [view]);
+
+  useFrame((_, delta) => {
+    if (!target.current) return;
+
+    camera.position.lerp(target.current, 1 - Math.pow(0.001, delta));
+    controls.current?.update();
+
+    if (camera.position.distanceTo(target.current) < 0.02) {
+      target.current = null;
+    }
+  });
+
+  return null;
+}
+
+export default function CarViewer({
+  car,
+  color,
+  paint,
+  wheelType,
+  spoilerType,
+  wheelSize,
+  stance,
+  view
+}) {
+  const controls = useRef(null);
+
   return (
     <Canvas
       shadows
@@ -102,10 +140,14 @@ export default function CarViewer({ car, color, paint, wheelType, spoilerType })
           paint={paint}
           wheelType={wheelType}
           spoilerType={spoilerType}
+          wheelSize={wheelSize}
+          stance={stance}
         />
 
         <ShowroomLighting />
       </Suspense>
+
+      <CameraRig view={view} controls={controls} />
 
       <ShowroomFloor />
 
@@ -120,8 +162,11 @@ export default function CarViewer({ car, color, paint, wheelType, spoilerType })
       />
 
       <OrbitControls
-        enablePan={false}
-        minDistance={4}
+        ref={controls}
+        enablePan
+        screenSpacePanning
+        panSpeed={0.6}
+        minDistance={3.5}
         maxDistance={16}
         minPolarAngle={0.1}
         maxPolarAngle={Math.PI / 2.15}

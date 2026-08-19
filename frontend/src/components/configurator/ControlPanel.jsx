@@ -4,6 +4,8 @@ import { paintFamilies, finishes } from "../../data/paint";
 import {
   wheelOptions,
   spoilerOptions,
+  wheelSizes,
+  stanceLevels,
   formatRupees
 } from "../../data/accessories";
 
@@ -200,9 +202,17 @@ export default function ControlPanel({
   setWheelType,
   spoilerType,
   setSpoilerType,
+  wheelSize,
+  setWheelSize,
+  stance,
+  setStance,
   total
 }) {
   const [tab, setTab] = useState("paint");
+
+  // The model's own wheels are welded into its bodywork, so nothing can be
+  // resized or lowered until they are swapped out.
+  const stock = wheelType === "stock";
 
   return (
     <aside className="flex w-full shrink-0 flex-col border-t border-line-soft bg-panel lg:w-[360px] lg:border-t-0 lg:border-l">
@@ -247,19 +257,62 @@ export default function ControlPanel({
         )}
 
         {tab === "wheels" && (
-          <div className="space-y-2">
-            <p className="label mb-3">Wheel style</p>
-            {wheelOptions.map((option) => (
-              <Choice
-                key={option.value}
-                option={option}
-                selected={wheelType === option.value}
-                onSelect={setWheelType}
-              />
-            ))}
-            <p className="pt-4 text-xs leading-relaxed text-fog">
-              Wheels are measured onto this car, so a swap lands in the arches
-              the originals came out of.
+          <div className="space-y-7">
+            <div className="space-y-2">
+              <p className="label mb-3">Wheel style</p>
+              {wheelOptions.map((option) => (
+                <Choice
+                  key={option.value}
+                  option={option}
+                  selected={wheelType === option.value}
+                  onSelect={setWheelType}
+                />
+              ))}
+            </div>
+
+            {/* PLUS-SIZING */}
+            <div className={stock ? "opacity-40" : ""}>
+              <p className="label">Rim size</p>
+              <div className="mt-2 grid grid-cols-4 gap-px bg-line-soft">
+                {wheelSizes.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    disabled={stock}
+                    onClick={() => setWheelSize(option.value)}
+                    title={option.note}
+                    className={[
+                      "py-2.5 text-center transition-colors disabled:cursor-not-allowed",
+                      wheelSize === option.value && !stock
+                        ? "bg-signal text-ink"
+                        : "bg-ink text-fog hover:text-chalk"
+                    ].join(" ")}
+                  >
+                    <span className="readout block text-[11px]">{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* STANCE */}
+            <div className={stock ? "opacity-40" : ""}>
+              <p className="label mb-3">Ride height</p>
+              <div className="space-y-2">
+                {stanceLevels.map((option) => (
+                  <Choice
+                    key={option.value}
+                    option={option}
+                    selected={stance === option.value && !stock}
+                    onSelect={stock ? () => {} : setStance}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <p className="text-xs leading-relaxed text-fog">
+              {stock
+                ? "Rim size and ride height need aftermarket wheels — the car's own wheels are part of its bodywork and cannot be moved separately."
+                : "Wheels are measured onto this car, so a swap lands in the arches the originals came out of. Plus-sizing keeps the overall diameter and trades sidewall for rim."}
             </p>
           </div>
         )}

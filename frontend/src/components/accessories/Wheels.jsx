@@ -8,6 +8,13 @@ const RUBBER = {
   metalness: 0
 };
 
+// Plus-sizing keeps the overall diameter and trades sidewall for rim, which is
+// exactly what fitting bigger alloys to a car does.
+const SIDEWALL = {
+  sport: [0.74, 0.78, 0.82, 0.86],
+  classic: [0.58, 0.62, 0.66, 0.7]
+};
+
 function Tire({ radius, width, sidewall }) {
   const rimRadius = radius * sidewall;
 
@@ -30,13 +37,13 @@ function Tire({ radius, width, sidewall }) {
   );
 }
 
-function SportWheel({ radius, width }) {
-  const rimRadius = radius * 0.78; // low profile tyre
+function SportWheel({ radius, width, sidewall }) {
+  const rimRadius = radius * sidewall;
   const spokes = 10;
 
   return (
     <>
-      <Tire radius={radius} width={width} sidewall={0.78} />
+      <Tire radius={radius} width={width} sidewall={sidewall} />
 
       {/* RIM BARREL */}
       <mesh rotation={[Math.PI / 2, 0, 0]}>
@@ -77,7 +84,7 @@ function SportWheel({ radius, width }) {
       </mesh>
 
       {/* BRAKE DISC + RED CALIPER */}
-      <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[rimRadius * 0.68, rimRadius * 0.68, width * 0.1, 32]} />
         <meshStandardMaterial color="#8a8f96" metalness={1} roughness={0.45} />
       </mesh>
@@ -90,13 +97,13 @@ function SportWheel({ radius, width }) {
   );
 }
 
-function ClassicWheel({ radius, width }) {
-  const rimRadius = radius * 0.62; // tall sidewall, small steel rim
+function ClassicWheel({ radius, width, sidewall }) {
+  const rimRadius = radius * sidewall;
   const vents = 6;
 
   return (
     <>
-      <Tire radius={radius} width={width} sidewall={0.62} />
+      <Tire radius={radius} width={width} sidewall={sidewall} />
 
       {/* STEEL RIM */}
       <mesh rotation={[Math.PI / 2, 0, 0]}>
@@ -139,9 +146,12 @@ function ClassicWheel({ radius, width }) {
   );
 }
 
-export default function Wheels({ type, wheels, axleAxis }) {
+export default function Wheels({ type, wheels, axleAxis, sizeStep = 1 }) {
 
   if (!wheels || type === "stock") return null;
+
+  const ladder = SIDEWALL[type] ?? SIDEWALL.sport;
+  const sidewall = ladder[Math.min(Math.max(sizeStep, 0), ladder.length - 1)];
 
   // Geometry above is built around local Z, so swap it onto X when the car's
   // axles run that way.
@@ -153,9 +163,17 @@ export default function Wheels({ type, wheels, axleAxis }) {
         <group key={index} position={wheel.position} rotation={rotation}>
 
           {type === "sport" ? (
-            <SportWheel radius={wheel.radius} width={wheel.thickness} />
+            <SportWheel
+              radius={wheel.radius}
+              width={wheel.thickness}
+              sidewall={sidewall}
+            />
           ) : (
-            <ClassicWheel radius={wheel.radius} width={wheel.thickness} />
+            <ClassicWheel
+              radius={wheel.radius}
+              width={wheel.thickness}
+              sidewall={sidewall}
+            />
           )}
 
         </group>

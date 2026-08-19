@@ -6,9 +6,12 @@ import ControlPanel from "./configurator/ControlPanel";
 import {
   wheelOptions,
   spoilerOptions,
+  wheelSizes,
+  stanceLevels,
   priceOf,
   formatRupees
 } from "../data/accessories";
+import { CAMERA_VIEWS } from "../data/views";
 
 function CarList({ selected, onSelect }) {
   return (
@@ -67,6 +70,9 @@ export default function Showroom() {
   const [finish, setFinish] = useState("glossy");
   const [wheelType, setWheelType] = useState("sport");
   const [spoilerType, setSpoilerType] = useState("stock");
+  const [wheelSize, setWheelSize] = useState(1);
+  const [stance, setStance] = useState(0);
+  const [view, setView] = useState("hero");
 
   const [paint, setPaint] = useState({
     metalness: finishes.glossy.metalness,
@@ -84,8 +90,15 @@ export default function Showroom() {
     }));
   };
 
+  // Sizing and stance only exist once the stock wheels are swapped out, so they
+  // are not charged for while they cannot be applied.
+  const aftermarket = wheelType !== "stock";
+
   const total =
-    priceOf(wheelOptions, wheelType) + priceOf(spoilerOptions, spoilerType);
+    priceOf(wheelOptions, wheelType) +
+    priceOf(spoilerOptions, spoilerType) +
+    (aftermarket ? priceOf(wheelSizes, wheelSize) : 0) +
+    (aftermarket ? priceOf(stanceLevels, stance) : 0);
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col lg:flex-row">
@@ -100,7 +113,29 @@ export default function Showroom() {
           paint={paint}
           wheelType={wheelType}
           spoilerType={spoilerType}
+          wheelSize={aftermarket ? wheelSize : 1}
+          stance={aftermarket ? stance : 0}
+          view={view}
         />
+
+        {/* CAMERA PRESETS */}
+        <div className="absolute top-5 right-5 z-10 flex gap-px bg-line-soft">
+          {CAMERA_VIEWS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => setView(preset.id)}
+              className={[
+                "px-3 py-2 text-[10px] tracking-widest uppercase transition-colors",
+                view === preset.id
+                  ? "bg-signal text-ink"
+                  : "bg-ink/80 text-fog hover:text-chalk"
+              ].join(" ")}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
 
         <div className="pointer-events-none absolute inset-0 p-5">
           <div className="hud-frame h-full w-full">
@@ -137,6 +172,10 @@ export default function Showroom() {
         setWheelType={setWheelType}
         spoilerType={spoilerType}
         setSpoilerType={setSpoilerType}
+        wheelSize={wheelSize}
+        setWheelSize={setWheelSize}
+        stance={stance}
+        setStance={setStance}
         total={total}
       />
     </div>

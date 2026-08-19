@@ -14,7 +14,9 @@ export default function CarModel({
   color,
   paint,
   wheelType,
-  spoilerType
+  spoilerType,
+  wheelSize = 1,
+  stance = 0
 }) {
 
   const { scene } = useGLTF(car.model);
@@ -44,6 +46,26 @@ export default function CarModel({
   }, [measurements]);
 
   const detected = measurements?.wheels ?? null;
+
+  // Lowering drops the body towards the wheels. How far it can go is set by the
+  // bodywork itself: whatever sits lowest once the wheels are discounted, less
+  // a little clearance, so no car is ever pushed through the floor.
+  const drop = useMemo(() => {
+    if (!measurements || !detected || !stance) return 0;
+
+    const wheelMeshes = new Set(detected.meshes);
+    let bodyFloor = Infinity;
+
+    for (const part of measurements.car.parts) {
+      if (wheelMeshes.has(part.ref)) continue;
+      bodyFloor = Math.min(bodyFloor, part.min.y);
+    }
+
+    if (!Number.isFinite(bodyFloor)) return 0;
+
+    const clearance = bodyFloor - measurements.car.box.min.y;
+    return Math.max(clearance - measurements.car.height * 0.012, 0) * stance;
+  }, [measurements, detected, stance]);
 
   // The model's own wheels are swapped out for the custom ones, and are put
   // back when the stock option is selected.
@@ -99,19 +121,24 @@ export default function CarModel({
 
   return (
     <group scale={fit.scale} position={fit.position}>
-      <primitive object={scene} />
+
+      {/* The body moves, the wheels stay on the road */}
+      <group position={[0, -drop, 0]}>
+        <primitive object={scene} />
+
+        <Spoiler
+          type={spoilerType}
+          car={measurements?.car}
+          scene={scene}
+          track={detected?.track}
+        />
+      </group>
 
       <Wheels
         type={wheelType}
         wheels={detected?.wheels}
         axleAxis={detected?.axleAxis}
-      />
-
-      <Spoiler
-        type={spoilerType}
-        car={measurements?.car}
-        scene={scene}
-        track={detected?.track}
+        sizeStep={wheelSize}
       />
     </group>
   );
