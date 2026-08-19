@@ -95,27 +95,6 @@ function DecalLayer({ car, decals, revision }) {
   return <Decals decals={decals} scene={scene} revision={revision} />;
 }
 
-// Development only: publishes what the renderer is actually doing, so a blank
-// viewport can be told apart from a car that is off camera or unlit.
-function RenderProbe() {
-  const { camera, gl, scene } = useThree();
-
-  useFrame(() => {
-    if (!import.meta.env.DEV) return;
-
-    window.__render = {
-      camera: [camera.position.x, camera.position.y, camera.position.z],
-      triangles: gl.info.render.triangles,
-      calls: gl.info.render.calls,
-      programs: gl.info.programs?.length ?? 0,
-      hasEnvironment: !!scene.environment,
-      toneMappingExposure: gl.toneMappingExposure
-    };
-  });
-
-  return null;
-}
-
 // Glides the camera to a preset instead of snapping, and hands control straight
 // back so the user can keep dragging.
 function CameraRig({ view, controls }) {
@@ -165,9 +144,6 @@ export default function CarViewer({
       shadows
       dpr={[1, 2]}
       camera={{ position: [5.2, 1.9, 6.4], fov: 40 }}
-      // Keeping the drawing buffer in development is what makes it possible to
-      // read back what was actually drawn and confirm the car is on screen.
-      gl={{ preserveDrawingBuffer: import.meta.env.DEV }}
     >
       <color attach="background" args={["#0a0b0e"]} />
       <fog attach="fog" args={["#0a0b0e", 18, 42]} />
@@ -214,8 +190,6 @@ export default function CarViewer({
       </Suspense>
 
       <CameraRig view={view} controls={controls} />
-
-      <RenderProbe />
 
       <ShowroomFloor />
 

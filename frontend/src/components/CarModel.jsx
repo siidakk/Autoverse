@@ -107,10 +107,6 @@ export default function CarModel({
     const freshScene = clonedFor.current !== scene;
     clonedFor.current = scene;
 
-    if (import.meta.env.DEV) {
-      window.__autoverse = { scene, car, detected, fit, drop };
-    }
-
     scene.traverse((child) => {
       if (!child.isMesh) return;
 
