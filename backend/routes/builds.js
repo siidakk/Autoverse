@@ -73,7 +73,7 @@ router.get("/:code", requireDatabase, async (req, res) => {
     const build = await Build.findOneAndUpdate(
       { code: req.params.code.toUpperCase() },
       { $inc: { views: 1 } },
-      { new: true }
+      { returnDocument: "after" }
     )
 
     if (!build) {

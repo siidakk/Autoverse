@@ -25,7 +25,8 @@ export default function CarModel({
   headlightType = "stock",
   underglow = null,
   wrap = { mode: "none", colour: "#111111" },
-  tint = { colour: "#dfe6ee", opacity: 0.35 }
+  tint = { colour: "#dfe6ee", opacity: 0.35 },
+  onPlaceDecal = null
 }) {
 
   const { scene } = useGLTF(car.model);
@@ -159,11 +160,31 @@ export default function CarModel({
 
   }, [scene, color, paint, detected, measurements, fit.scale, wrap, tint]);
 
+  // Placing a decal records where on the panel it landed, in that panel's own
+  // space, so it travels with the car rather than hanging in the air.
+  const handlePlace = (event) => {
+    if (!onPlaceDecal || !event.face) return;
+
+    event.stopPropagation();
+
+    const target = event.object;
+    const anchor = target.worldToLocal(event.point.clone());
+
+    onPlaceDecal({
+      uuid: target.uuid,
+      anchor: [anchor.x, anchor.y, anchor.z],
+      normal: [event.face.normal.x, event.face.normal.y, event.face.normal.z]
+    });
+  };
+
   return (
     <group scale={fit.scale} position={fit.position}>
 
       {/* The body moves, the wheels stay on the road */}
-      <group position={[0, -drop, 0]}>
+      <group
+        position={[0, -drop, 0]}
+        onClick={onPlaceDecal ? handlePlace : undefined}
+      >
         <primitive object={scene} />
 
         <Spoiler

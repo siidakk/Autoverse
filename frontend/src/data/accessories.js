@@ -80,6 +80,14 @@ export const tintOptions = [
   { value: "limo", label: "5%", note: "Limo black", price: 4500, opacity: 0.9, colour: "#141619" }
 ];
 
+// Decals are charged per sticker, so the price here is what each one costs.
+export const decalOptions = [
+  { value: "roundel", label: "Race number", note: "Numbered roundel", price: 900 },
+  { value: "stripe", label: "Flag stripe", note: "Three bar stripe", price: 700 },
+  { value: "flame", label: "Flame", note: "Down the flank", price: 1200 },
+  { value: "star", label: "Star", note: "Single star", price: 600 }
+];
+
 export const optionBy = (options, value) =>
   options.find((option) => option.value === value) ?? options[0];
 

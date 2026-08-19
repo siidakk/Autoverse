@@ -6,8 +6,10 @@ import {
   Environment,
   Lightformer,
   ContactShadows,
-  MeshReflectorMaterial
+  MeshReflectorMaterial,
+  useGLTF
 } from "@react-three/drei";
+import Decals from "./accessories/Decals";
 import CarModel from "./CarModel";
 import { CAMERA_VIEWS } from "../data/views";
 
@@ -75,6 +77,13 @@ function ShowroomFloor() {
   );
 }
 
+// Decals are projected in world space, so they hang alongside the car rather
+// than inside the group that scales and lowers it.
+function DecalLayer({ car, decals, revision }) {
+  const { scene } = useGLTF(car.model);
+  return <Decals decals={decals} scene={scene} revision={revision} />;
+}
+
 // Glides the camera to a preset instead of snapping, and hands control straight
 // back so the user can keep dragging.
 function CameraRig({ view, controls }) {
@@ -113,6 +122,8 @@ export default function CarViewer({
   underglow,
   wrap,
   tint,
+  decals,
+  onPlaceDecal,
   view
 }) {
   const controls = useRef(null);
@@ -152,6 +163,13 @@ export default function CarViewer({
           underglow={underglow}
           wrap={wrap}
           tint={tint}
+          onPlaceDecal={onPlaceDecal}
+        />
+
+        <DecalLayer
+          car={car}
+          decals={decals}
+          revision={`${car.model}-${stance}-${wheelType}`}
         />
 
         <ShowroomLighting />

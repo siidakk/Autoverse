@@ -14,6 +14,7 @@ import {
   wrapOptions,
   wrapColours,
   tintOptions,
+  decalOptions,
   formatRupees
 } from "../../data/accessories";
 
@@ -233,7 +234,11 @@ export default function ControlPanel({
   restoring,
   comparing,
   setComparing,
-  changes
+  changes,
+  decals,
+  decalDesign,
+  setDecalDesign,
+  clearDecals
 }) {
   const [tab, setTab] = useState("paint");
 
@@ -481,10 +486,60 @@ export default function ControlPanel({
               </div>
             </div>
 
+            {/* DECALS */}
+            <div>
+              <div className="flex items-baseline justify-between">
+                <p className="label">Decals</p>
+                {decals.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearDecals}
+                    className="label hover:text-signal"
+                  >
+                    Clear {decals.length}
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {decalOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() =>
+                      setDecalDesign(
+                        decalDesign === option.value ? null : option.value
+                      )
+                    }
+                    className={[
+                      "border px-3 py-2.5 text-left transition-colors",
+                      decalDesign === option.value
+                        ? "border-signal bg-signal/10"
+                        : "border-line-soft bg-ink hover:border-line"
+                    ].join(" ")}
+                  >
+                    <span className="block text-[11px] text-chalk">
+                      {option.label}
+                    </span>
+                    <span className="readout mt-0.5 block text-[9px] text-fog">
+                      +{option.price}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {decalDesign && (
+                <p className="mt-3 border border-signal px-3 py-2 text-xs text-signal">
+                  Now click the car where you want it.
+                </p>
+              )}
+            </div>
+
             <p className="text-xs leading-relaxed text-fog">
               Beams aim out of whichever end the car's nose is, worked out from
               the bodywork rather than set per model. Glazing is picked out by
-              being see-through, since names vary across every model here.
+              being see-through, since names vary across every model here, and
+              decals are projected onto whichever panel you click.
             </p>
           </div>
         )}

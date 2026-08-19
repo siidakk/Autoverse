@@ -14,6 +14,7 @@ import {
   underglowOptions,
   wrapOptions,
   tintOptions,
+  decalOptions,
   priceOf,
   colourOf,
   optionBy,
@@ -89,6 +90,25 @@ export default function Showroom() {
   const [tintLevel, setTintLevel] = useState("clear");
   const [view, setView] = useState("hero");
   const [comparing, setComparing] = useState(false);
+  const [decals, setDecals] = useState([]);
+  const [decalDesign, setDecalDesign] = useState(null);
+
+  const placeDecal = useCallback(
+    (hit) => {
+      setDecals((current) => [
+        ...current,
+        {
+          ...hit,
+          id: `${Date.now()}-${current.length}`,
+          design: decalDesign,
+          size: 0.42,
+          rotation: 0
+        }
+      ]);
+      setDecalDesign(null);
+    },
+    [decalDesign]
+  );
 
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -163,6 +183,10 @@ export default function Showroom() {
     priceOf(underglowOptions, underglow) +
     priceOf(wrapOptions, wrapMode) +
     priceOf(tintOptions, tintLevel) +
+    decals.reduce(
+      (sum, decal) => sum + priceOf(decalOptions, decal.design),
+      0
+    ) +
     (aftermarket ? priceOf(wheelSizes, wheelSize) : 0) +
     (aftermarket ? priceOf(stanceLevels, stance) : 0);
 
@@ -245,6 +269,8 @@ export default function Showroom() {
           underglow={colourOf(underglowOptions, shown.underglow)}
           wrap={{ mode: shown.wrapMode, colour: wrapColour }}
           tint={optionBy(tintOptions, shown.tintLevel)}
+          decals={comparing ? [] : decals}
+          onPlaceDecal={decalDesign ? placeDecal : null}
           view={view}
         />
 
@@ -325,6 +351,10 @@ export default function Showroom() {
         comparing={comparing}
         setComparing={setComparing}
         changes={changes}
+        decals={decals}
+        decalDesign={decalDesign}
+        setDecalDesign={setDecalDesign}
+        clearDecals={() => setDecals([])}
       />
     </div>
   );
