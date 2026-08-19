@@ -225,7 +225,7 @@ export default function CarModel({
           track={detected?.track}
         />
 
-        <Exhaust type={exhaustType} car={measurements?.car} />
+        <Exhaust type={exhaustType} car={measurements?.car} wheels={detected} />
 
         <Headlights type={headlightType} car={measurements?.car} />
       </group>
