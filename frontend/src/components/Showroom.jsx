@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { cars, bodyStyles } from "../data/cars";
 import { finishes } from "../data/paint";
@@ -222,6 +222,23 @@ export default function Showroom() {
 
   const shown = comparing ? stockSpec : currentSpec;
 
+  // Kept stable, because a fresh object here re-runs the material work in the
+  // model on every single render.
+  const wrap = useMemo(
+    () => ({ mode: shown.wrapMode, colour: wrapColour }),
+    [shown.wrapMode, wrapColour]
+  );
+
+  const tint = useMemo(
+    () => optionBy(tintOptions, shown.tintLevel),
+    [shown.tintLevel]
+  );
+
+  const underglowColour = useMemo(
+    () => colourOf(underglowOptions, shown.underglow),
+    [shown.underglow]
+  );
+
   const buildPayload = useCallback(
     () => ({
       carId: selectedCar.id,
@@ -266,9 +283,9 @@ export default function Showroom() {
           stance={shown.stance}
           exhaustType={shown.exhaustType}
           headlightType={shown.headlightType}
-          underglow={colourOf(underglowOptions, shown.underglow)}
-          wrap={{ mode: shown.wrapMode, colour: wrapColour }}
-          tint={optionBy(tintOptions, shown.tintLevel)}
+          underglow={underglowColour}
+          wrap={wrap}
+          tint={tint}
           decals={comparing ? [] : decals}
           onPlaceDecal={decalDesign ? placeDecal : null}
           view={view}

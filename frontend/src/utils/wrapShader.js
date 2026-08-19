@@ -19,6 +19,11 @@ const AXIS_VECTORS = {
   z: new THREE.Vector3(0, 0, 1)
 };
 
+// Uniforms are held beside the material rather than on it. Material.clone()
+// deep copies userData through JSON, which would flatten a Color into a plain
+// object and lose every method on it.
+const patched = new WeakMap();
+
 export function applyWrap(material, options) {
   const {
     mode = "none",
@@ -30,8 +35,19 @@ export function applyWrap(material, options) {
     groundY = 0
   } = options;
 
-  material.userData.wrap = material.userData.wrap ?? {};
-  const store = material.userData.wrap;
+  const existing = patched.get(material);
+
+  // Already patched: refresh the values so switching wraps costs nothing.
+  if (existing) {
+    existing.uWrapMode.value = WRAP_MODES[mode] ?? 0;
+    existing.uWrapColour.value.set(colour);
+    existing.uLateral.value.copy(AXIS_VECTORS[widthAxis]);
+    existing.uLongitudinal.value.copy(AXIS_VECTORS[lengthAxis]);
+    existing.uCarLength.value = carLength;
+    existing.uCarHeight.value = carHeight;
+    existing.uGroundY.value = groundY;
+    return;
+  }
 
   const uniforms = {
     uWrapMode: { value: WRAP_MODES[mode] ?? 0 },
@@ -43,19 +59,7 @@ export function applyWrap(material, options) {
     uGroundY: { value: groundY }
   };
 
-  // Already patched: just refresh the values so switching wraps is cheap.
-  if (store.uniforms) {
-    store.uniforms.uWrapMode.value = uniforms.uWrapMode.value;
-    store.uniforms.uWrapColour.value.set(colour);
-    store.uniforms.uLateral.value.copy(uniforms.uLateral.value);
-    store.uniforms.uLongitudinal.value.copy(uniforms.uLongitudinal.value);
-    store.uniforms.uCarLength.value = carLength;
-    store.uniforms.uCarHeight.value = carHeight;
-    store.uniforms.uGroundY.value = groundY;
-    return;
-  }
-
-  store.uniforms = uniforms;
+  patched.set(material, uniforms);
 
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -113,6 +117,8 @@ export function applyWrap(material, options) {
       );
   };
 
-  material.customProgramCacheKey = () => `wrap-${mode}`;
+  // One key for every wrapped material: the mode is a uniform, so all of them
+  // share a single compiled program rather than one per pattern.
+  material.customProgramCacheKey = () => "autoverse-wrap";
   material.needsUpdate = true;
 }

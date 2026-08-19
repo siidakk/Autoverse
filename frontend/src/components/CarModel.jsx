@@ -1,5 +1,5 @@
 import { useGLTF } from "@react-three/drei";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import Wheels from "./accessories/Wheels";
 import Spoiler from "./accessories/Spoiler";
@@ -30,6 +30,9 @@ export default function CarModel({
 }) {
 
   const { scene } = useGLTF(car.model);
+
+  // Which scene's materials have already been cloned for this configurator.
+  const clonedFor = useRef(null);
 
   const measurements = useMemo(() => {
     const measured = inspectCar(scene);
@@ -101,6 +104,9 @@ export default function CarModel({
     const wheelMeshes = new Set(detected?.meshes ?? []);
     const car = measurements.car;
 
+    const freshScene = clonedFor.current !== scene;
+    clonedFor.current = scene;
+
     scene.traverse((child) => {
       if (!child.isMesh) return;
 
@@ -109,7 +115,13 @@ export default function CarModel({
 
       if (wheelMeshes.has(child)) return;
 
-      child.material = child.material.clone();
+      // Cloned once per model so this car's paint does not leak into the same
+      // model elsewhere. Re-cloning on every change would spawn a fresh shader
+      // program per frame, which is what was tearing down the GL context.
+      if (freshScene) {
+        child.material = child.material.clone();
+      }
+
       const material = child.material;
 
       // Glazing is left out of the paint. Names are useless across this garage,
