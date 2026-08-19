@@ -2,27 +2,31 @@
 // cars on the road are white, silver, grey or black, then hue families each
 // holding a light-to-dark run of shades.
 
+// Car paint is a dielectric with a clearcoat over it, not a metal. Treating it
+// as half or nearly fully metallic made every car mirror the showroom, which is
+// dark, so the paint came out near black whatever colour was chosen. Metalness
+// stays low and the finishes differ by how rough the surface is.
 export const finishes = {
   matte: {
     label: "Matte",
     note: "Flat, no reflection",
-    metalness: 0.1,
-    roughness: 0.8,
+    metalness: 0,
+    roughness: 0.82,
     clearcoat: 0
   },
   glossy: {
     label: "Gloss",
     note: "Factory clearcoat",
-    metalness: 0.5,
-    roughness: 0.15,
+    metalness: 0.05,
+    roughness: 0.28,
     clearcoat: 1
   },
   metallic: {
     label: "Metallic",
     note: "Flake, deep shine",
-    metalness: 0.9,
-    roughness: 0.25,
-    clearcoat: 0.6
+    metalness: 0.45,
+    roughness: 0.34,
+    clearcoat: 0.7
   }
 };
 

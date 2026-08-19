@@ -4,6 +4,7 @@ import { cars, bodyStyles } from "../data/cars";
 import { finishes } from "../data/paint";
 import CarViewer from "./CarViewer";
 import ControlPanel from "./configurator/ControlPanel";
+import ViewportLoader from "./configurator/ViewportLoader";
 import {
   wheelOptions,
   spoilerOptions,
@@ -290,6 +291,8 @@ export default function Showroom() {
           onPlaceDecal={decalDesign ? placeDecal : null}
           view={view}
         />
+
+        <ViewportLoader car={selectedCar} />
 
         {/* CAMERA PRESETS */}
         <div className="absolute top-5 right-5 z-10 flex gap-px bg-line-soft">

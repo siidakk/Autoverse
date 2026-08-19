@@ -15,42 +15,53 @@ import { CAMERA_VIEWS } from "../data/views";
 
 // Studio softboxes built in code rather than an HDR file, so the showroom needs
 // no extra assets and still gives the paint something to reflect.
+//
+// The room this builds is what the car reflects, so it cannot be as dark as the
+// page around it. A black room reflected in the paint is a black car, whatever
+// colour was picked.
 function ShowroomLighting() {
   return (
     <Environment resolution={256} frames={1}>
-      <color attach="background" args={["#0a0b0e"]} />
+      <color attach="background" args={["#5c626b"]} />
 
       {/* CEILING STRIPS */}
       {[-4, -1.5, 1.5, 4].map((x) => (
         <Lightformer
           key={x}
-          intensity={2.4}
+          intensity={5}
           position={[x, 5, -1]}
           rotation={[Math.PI / 2, 0, 0]}
-          scale={[1.2, 12, 1]}
+          scale={[2, 12, 1]}
         />
       ))}
 
       {/* SIDE FILL */}
       <Lightformer
-        intensity={3}
+        intensity={4}
         position={[-8, 3, 2]}
         rotation={[0, Math.PI / 2, 0]}
-        scale={[8, 6, 1]}
+        scale={[10, 8, 1]}
       />
       <Lightformer
-        intensity={2}
+        intensity={3}
         position={[8, 3, 2]}
         rotation={[0, -Math.PI / 2, 0]}
-        scale={[8, 6, 1]}
+        scale={[10, 8, 1]}
       />
 
       {/* RIM LIGHT FROM BEHIND */}
       <Lightformer
-        intensity={2.5}
+        intensity={3.5}
         position={[0, 2, -8]}
-        rotation={[0, 0, 0]}
-        scale={[12, 5, 1]}
+        scale={[14, 6, 1]}
+      />
+
+      {/* BOUNCE OFF THE FLOOR, WHICH KEEPS THE SILLS OFF BLACK */}
+      <Lightformer
+        intensity={1.4}
+        position={[0, -3, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        scale={[14, 14, 1]}
       />
     </Environment>
   );
@@ -133,21 +144,27 @@ export default function CarViewer({
       shadows
       dpr={[1, 2]}
       camera={{ position: [5.2, 1.9, 6.4], fov: 40 }}
+      // Keeping the drawing buffer in development is what makes it possible to
+      // read back what was actually drawn and confirm the car is on screen.
+      gl={{ preserveDrawingBuffer: import.meta.env.DEV }}
     >
       <color attach="background" args={["#0a0b0e"]} />
       <fog attach="fog" args={["#0a0b0e", 18, 42]} />
 
-      <ambientLight intensity={0.35} />
+      <ambientLight intensity={0.7} />
 
       <spotLight
         position={[6, 9, 6]}
-        angle={0.5}
+        angle={0.6}
         penumbra={0.8}
-        intensity={2.5}
+        intensity={40}
+        distance={40}
+        decay={1.4}
         castShadow
         shadow-mapSize={[2048, 2048]}
       />
-      <directionalLight position={[-6, 6, -4]} intensity={0.7} />
+      <directionalLight position={[-6, 6, -4]} intensity={1.4} />
+      <directionalLight position={[4, 3, -6]} intensity={0.8} />
 
       <Suspense fallback={null}>
         <CarModel

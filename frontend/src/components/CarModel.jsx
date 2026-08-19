@@ -188,7 +188,7 @@ export default function CarModel({
       material.needsUpdate = true;
     });
 
-  }, [scene, color, paint, detected, measurements, fit.scale, wrap, tint]);
+  }, [scene, color, paint, detected, measurements, fit, drop, wrap, tint]);
 
   // Placing a decal records where on the panel it landed, in that panel's own
   // space, so it travels with the car rather than hanging in the air.
