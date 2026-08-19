@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { cars, bodyStyles } from "../data/cars";
 import { finishes } from "../data/paint";
 import CarViewer from "./CarViewer";
@@ -19,6 +20,7 @@ import {
   formatRupees
 } from "../data/accessories";
 import { CAMERA_VIEWS } from "../data/views";
+import { loadBuild } from "../lib/api";
 
 function CarList({ selected, onSelect }) {
   return (
@@ -86,6 +88,14 @@ export default function Showroom() {
   const [wrapColour, setWrapColour] = useState("#0c0d0f");
   const [tintLevel, setTintLevel] = useState("clear");
   const [view, setView] = useState("hero");
+  const [comparing, setComparing] = useState(false);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // A build in the address bar is loaded once and poured back into state. The
+  // flag starts on when there is a code, so the effect never has to set it.
+  const sharedCode = searchParams.get("build");
+  const [restoring, setRestoring] = useState(Boolean(sharedCode));
 
   const [paint, setPaint] = useState({
     metalness: finishes.glossy.metalness,
@@ -93,7 +103,7 @@ export default function Showroom() {
     clearcoat: finishes.glossy.clearcoat
   });
 
-  const applyFinish = (next) => {
+  const applyFinish = useCallback((next) => {
     setFinish(next);
     setPaint((previous) => ({
       ...previous,
@@ -101,7 +111,45 @@ export default function Showroom() {
       roughness: finishes[next].roughness,
       clearcoat: finishes[next].clearcoat
     }));
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!sharedCode) return;
+
+    let cancelled = false;
+
+    loadBuild(sharedCode)
+      .then((build) => {
+        if (cancelled) return;
+
+        const car = cars.find((entry) => entry.id === build.carId);
+        if (car) setSelectedCar(car);
+
+        const spec = build.spec ?? {};
+        if (spec.color) setColor(spec.color);
+        if (spec.finish) applyFinish(spec.finish);
+        if (spec.wheelType) setWheelType(spec.wheelType);
+        if (spec.wheelSize !== undefined) setWheelSize(spec.wheelSize);
+        if (spec.stance !== undefined) setStance(spec.stance);
+        if (spec.spoilerType) setSpoilerType(spec.spoilerType);
+        if (spec.exhaustType) setExhaustType(spec.exhaustType);
+        if (spec.headlightType) setHeadlightType(spec.headlightType);
+        if (spec.underglow) setUnderglow(spec.underglow);
+        if (spec.wrapMode) setWrapMode(spec.wrapMode);
+        if (spec.wrapColour) setWrapColour(spec.wrapColour);
+        if (spec.tintLevel) setTintLevel(spec.tintLevel);
+      })
+      .catch(() => {
+        // A bad code should not strand the configurator; it just opens blank.
+      })
+      .finally(() => {
+        if (!cancelled) setRestoring(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sharedCode, applyFinish]);
 
   // Sizing and stance only exist once the stock wheels are swapped out, so they
   // are not charged for while they cannot be applied.
@@ -118,6 +166,65 @@ export default function Showroom() {
     (aftermarket ? priceOf(wheelSizes, wheelSize) : 0) +
     (aftermarket ? priceOf(stanceLevels, stance) : 0);
 
+  // Everything the user has moved away from factory, which drives both the
+  // change count and what the comparison reverts.
+  const stockSpec = {
+    wheelType: "stock",
+    wheelSize: 1,
+    stance: 0,
+    spoilerType: "stock",
+    exhaustType: "stock",
+    headlightType: "stock",
+    underglow: "off",
+    wrapMode: "none",
+    tintLevel: "clear"
+  };
+
+  const currentSpec = {
+    wheelType,
+    wheelSize: aftermarket ? wheelSize : 1,
+    stance: aftermarket ? stance : 0,
+    spoilerType,
+    exhaustType,
+    headlightType,
+    underglow,
+    wrapMode,
+    tintLevel
+  };
+
+  const changes = Object.keys(stockSpec).filter(
+    (key) => stockSpec[key] !== currentSpec[key]
+  ).length;
+
+  const shown = comparing ? stockSpec : currentSpec;
+
+  const buildPayload = useCallback(
+    () => ({
+      carId: selectedCar.id,
+      carName: selectedCar.name,
+      total,
+      spec: {
+        color,
+        finish,
+        wheelType,
+        wheelSize,
+        stance,
+        spoilerType,
+        exhaustType,
+        headlightType,
+        underglow,
+        wrapMode,
+        wrapColour,
+        tintLevel
+      }
+    }),
+    [
+      selectedCar, total, color, finish, wheelType, wheelSize, stance,
+      spoilerType, exhaustType, headlightType, underglow, wrapMode,
+      wrapColour, tintLevel
+    ]
+  );
+
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col lg:flex-row">
 
@@ -129,15 +236,15 @@ export default function Showroom() {
           car={selectedCar}
           color={color}
           paint={paint}
-          wheelType={wheelType}
-          spoilerType={spoilerType}
-          wheelSize={aftermarket ? wheelSize : 1}
-          stance={aftermarket ? stance : 0}
-          exhaustType={exhaustType}
-          headlightType={headlightType}
-          underglow={colourOf(underglowOptions, underglow)}
-          wrap={{ mode: wrapMode, colour: wrapColour }}
-          tint={optionBy(tintOptions, tintLevel)}
+          wheelType={shown.wheelType}
+          spoilerType={shown.spoilerType}
+          wheelSize={shown.wheelSize}
+          stance={shown.stance}
+          exhaustType={shown.exhaustType}
+          headlightType={shown.headlightType}
+          underglow={colourOf(underglowOptions, shown.underglow)}
+          wrap={{ mode: shown.wrapMode, colour: wrapColour }}
+          tint={optionBy(tintOptions, shown.tintLevel)}
           view={view}
         />
 
@@ -212,6 +319,12 @@ export default function Showroom() {
         tintLevel={tintLevel}
         setTintLevel={setTintLevel}
         total={total}
+        buildPayload={buildPayload}
+        onSaved={(code) => setSearchParams({ build: code }, { replace: true })}
+        restoring={restoring}
+        comparing={comparing}
+        setComparing={setComparing}
+        changes={changes}
       />
     </div>
   );

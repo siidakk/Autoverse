@@ -39,3 +39,7 @@ const mlRoute =
 require("./routes/mlRecommend")
 
 app.use("/ml", mlRoute)
+
+const buildsRoute = require("./routes/builds")
+
+app.use("/builds", buildsRoute)

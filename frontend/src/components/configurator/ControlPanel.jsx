@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { paintFamilies, finishes } from "../../data/paint";
+import SaveBuild from "./SaveBuild";
+import CompareToggle from "./CompareToggle";
 import {
   wheelOptions,
   spoilerOptions,
@@ -225,7 +227,13 @@ export default function ControlPanel({
   setWrapColour,
   tintLevel,
   setTintLevel,
-  total
+  total,
+  buildPayload,
+  onSaved,
+  restoring,
+  comparing,
+  setComparing,
+  changes
 }) {
   const [tab, setTab] = useState("paint");
 
@@ -238,7 +246,7 @@ export default function ControlPanel({
 
       {/* HEADER */}
       <div className="border-b border-line-soft px-5 py-4">
-        <p className="label">Building</p>
+        <p className="label">{restoring ? "Restoring build…" : "Building"}</p>
         <p className="mt-1 text-lg font-medium tracking-tight">{car.name}</p>
         <p className="readout mt-0.5 text-xs text-fog">{car.bodyStyle}</p>
       </div>
@@ -491,7 +499,19 @@ export default function ControlPanel({
           </span>
         </div>
 
-        <Link to="/recommend" className="btn btn-ghost mt-4 w-full">
+        <div className="mt-4">
+          <CompareToggle
+            comparing={comparing}
+            setComparing={setComparing}
+            changes={changes}
+          />
+        </div>
+
+        <div className="mt-3">
+          <SaveBuild buildPayload={buildPayload} onSaved={onSaved} />
+        </div>
+
+        <Link to="/recommend" className="btn btn-ghost mt-3 w-full">
           Find matching cars
         </Link>
       </div>
