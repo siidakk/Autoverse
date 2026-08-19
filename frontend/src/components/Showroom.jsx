@@ -8,7 +8,11 @@ import {
   spoilerOptions,
   wheelSizes,
   stanceLevels,
+  exhaustOptions,
+  headlightOptions,
+  underglowOptions,
   priceOf,
+  colourOf,
   formatRupees
 } from "../data/accessories";
 import { CAMERA_VIEWS } from "../data/views";
@@ -72,6 +76,9 @@ export default function Showroom() {
   const [spoilerType, setSpoilerType] = useState("stock");
   const [wheelSize, setWheelSize] = useState(1);
   const [stance, setStance] = useState(0);
+  const [exhaustType, setExhaustType] = useState("stock");
+  const [headlightType, setHeadlightType] = useState("stock");
+  const [underglow, setUnderglow] = useState("off");
   const [view, setView] = useState("hero");
 
   const [paint, setPaint] = useState({
@@ -97,6 +104,9 @@ export default function Showroom() {
   const total =
     priceOf(wheelOptions, wheelType) +
     priceOf(spoilerOptions, spoilerType) +
+    priceOf(exhaustOptions, exhaustType) +
+    priceOf(headlightOptions, headlightType) +
+    priceOf(underglowOptions, underglow) +
     (aftermarket ? priceOf(wheelSizes, wheelSize) : 0) +
     (aftermarket ? priceOf(stanceLevels, stance) : 0);
 
@@ -115,6 +125,9 @@ export default function Showroom() {
           spoilerType={spoilerType}
           wheelSize={aftermarket ? wheelSize : 1}
           stance={aftermarket ? stance : 0}
+          exhaustType={exhaustType}
+          headlightType={headlightType}
+          underglow={colourOf(underglowOptions, underglow)}
           view={view}
         />
 
@@ -176,6 +189,12 @@ export default function Showroom() {
         setWheelSize={setWheelSize}
         stance={stance}
         setStance={setStance}
+        exhaustType={exhaustType}
+        setExhaustType={setExhaustType}
+        headlightType={headlightType}
+        setHeadlightType={setHeadlightType}
+        underglow={underglow}
+        setUnderglow={setUnderglow}
         total={total}
       />
     </div>

@@ -108,6 +108,9 @@ export default function CarViewer({
   spoilerType,
   wheelSize,
   stance,
+  exhaustType,
+  headlightType,
+  underglow,
   view
 }) {
   const controls = useRef(null);
@@ -142,6 +145,9 @@ export default function CarViewer({
           spoilerType={spoilerType}
           wheelSize={wheelSize}
           stance={stance}
+          exhaustType={exhaustType}
+          headlightType={headlightType}
+          underglow={underglow}
         />
 
         <ShowroomLighting />

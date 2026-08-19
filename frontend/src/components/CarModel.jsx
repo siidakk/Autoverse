@@ -3,6 +3,9 @@ import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import Wheels from "./accessories/Wheels";
 import Spoiler from "./accessories/Spoiler";
+import Exhaust from "./accessories/Exhaust";
+import Headlights from "./accessories/Headlights";
+import Underglow from "./accessories/Underglow";
 import { inspectCar, detectWheels } from "../utils/carGeometry";
 
 // Every model arrives at a different scale and sitting at a different height,
@@ -16,7 +19,10 @@ export default function CarModel({
   wheelType,
   spoilerType,
   wheelSize = 1,
-  stance = 0
+  stance = 0,
+  exhaustType = "stock",
+  headlightType = "stock",
+  underglow = null
 }) {
 
   const { scene } = useGLTF(car.model);
@@ -132,7 +138,18 @@ export default function CarModel({
           scene={scene}
           track={detected?.track}
         />
+
+        <Exhaust type={exhaustType} car={measurements?.car} />
+
+        <Headlights type={headlightType} car={measurements?.car} />
       </group>
+
+      {/* Lighting under the car stays with the road, not the lowered body */}
+      <Underglow
+        colour={underglow}
+        car={measurements?.car}
+        radius={detected?.radius}
+      />
 
       <Wheels
         type={wheelType}

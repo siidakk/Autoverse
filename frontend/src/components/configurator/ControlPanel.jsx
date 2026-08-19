@@ -6,13 +6,17 @@ import {
   spoilerOptions,
   wheelSizes,
   stanceLevels,
+  exhaustOptions,
+  headlightOptions,
+  underglowOptions,
   formatRupees
 } from "../../data/accessories";
 
 const TABS = [
   { id: "paint", label: "Paint" },
   { id: "wheels", label: "Wheels" },
-  { id: "body", label: "Body" }
+  { id: "body", label: "Body" },
+  { id: "extras", label: "Extras" }
 ];
 
 function Choice({ option, selected, onSelect }) {
@@ -206,6 +210,12 @@ export default function ControlPanel({
   setWheelSize,
   stance,
   setStance,
+  exhaustType,
+  setExhaustType,
+  headlightType,
+  setHeadlightType,
+  underglow,
+  setUnderglow,
   total
 }) {
   const [tab, setTab] = useState("paint");
@@ -318,19 +328,86 @@ export default function ControlPanel({
         )}
 
         {tab === "body" && (
-          <div className="space-y-2">
-            <p className="label mb-3">Spoiler</p>
-            {spoilerOptions.map((option) => (
-              <Choice
-                key={option.value}
-                option={option}
-                selected={spoilerType === option.value}
-                onSelect={setSpoilerType}
-              />
-            ))}
-            <p className="pt-4 text-xs leading-relaxed text-fog">
-              Height is read off the boot lid by raycasting, so the part follows
-              the panel rather than floating above it.
+          <div className="space-y-7">
+            <div className="space-y-2">
+              <p className="label mb-3">Spoiler</p>
+              {spoilerOptions.map((option) => (
+                <Choice
+                  key={option.value}
+                  option={option}
+                  selected={spoilerType === option.value}
+                  onSelect={setSpoilerType}
+                />
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <p className="label mb-3">Exhaust</p>
+              {exhaustOptions.map((option) => (
+                <Choice
+                  key={option.value}
+                  option={option}
+                  selected={exhaustType === option.value}
+                  onSelect={setExhaustType}
+                />
+              ))}
+            </div>
+
+            <p className="text-xs leading-relaxed text-fog">
+              Spoiler height is read off the boot lid by raycasting, and the
+              tips sit against the measured rear bumper, so both follow the car
+              instead of floating near it.
+            </p>
+          </div>
+        )}
+
+        {tab === "extras" && (
+          <div className="space-y-7">
+            <div className="space-y-2">
+              <p className="label mb-3">Headlights</p>
+              {headlightOptions.map((option) => (
+                <Choice
+                  key={option.value}
+                  option={option}
+                  selected={headlightType === option.value}
+                  onSelect={setHeadlightType}
+                />
+              ))}
+            </div>
+
+            <div>
+              <p className="label mb-3">Underglow</p>
+              <div className="grid grid-cols-3 gap-2">
+                {underglowOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setUnderglow(option.value)}
+                    className={[
+                      "border px-2 py-3 text-center transition-colors",
+                      underglow === option.value
+                        ? "border-signal bg-signal/10"
+                        : "border-line-soft bg-ink hover:border-line"
+                    ].join(" ")}
+                  >
+                    <span
+                      className="mx-auto block h-4 w-4 rounded-full border border-line"
+                      style={{ background: option.colour ?? "transparent" }}
+                    />
+                    <span className="mt-2 block text-[11px] text-chalk">
+                      {option.label}
+                    </span>
+                    <span className="readout mt-0.5 block text-[9px] text-fog">
+                      {option.price ? `+${option.price / 1000}k` : "—"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <p className="text-xs leading-relaxed text-fog">
+              Beams aim out of whichever end the car's nose is, worked out from
+              the bodywork rather than set per model.
             </p>
           </div>
         )}

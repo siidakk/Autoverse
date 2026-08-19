@@ -30,6 +30,33 @@ export const stanceLevels = [
   { value: 0.8, label: "Slammed", note: "Coilovers", price: 11000 }
 ];
 
+export const exhaustOptions = [
+  { value: "stock", label: "Stock", note: "Factory pipe", price: 0 },
+  { value: "twin", label: "Twin", note: "Chrome pair", price: 4500 },
+  { value: "quad", label: "Quad", note: "Four tips", price: 8000 },
+  { value: "centre", label: "Centre exit", note: "Burnt titanium", price: 9500 },
+  { value: "carbon", label: "Carbon", note: "Wide carbon tips", price: 12000 }
+];
+
+export const headlightOptions = [
+  { value: "stock", label: "Stock", note: "As fitted", price: 0 },
+  { value: "halogen", label: "Halogen", note: "Warm, yellow", price: 2000 },
+  { value: "xenon", label: "Xenon", note: "Cool white", price: 6500 },
+  { value: "laser", label: "Laser", note: "Blue white, brightest", price: 14000 }
+];
+
+export const underglowOptions = [
+  { value: "off", label: "Off", note: "No underglow", price: 0, colour: null },
+  { value: "ice", label: "Ice", note: "Cold blue", price: 5500, colour: "#5bc8ff" },
+  { value: "toxic", label: "Toxic", note: "Acid green", price: 5500, colour: "#8bff4d" },
+  { value: "ember", label: "Ember", note: "Deep orange", price: 5500, colour: "#ff6a1f" },
+  { value: "violet", label: "Violet", note: "Ultraviolet", price: 6500, colour: "#b06bff" },
+  { value: "rose", label: "Rose", note: "Hot pink", price: 6500, colour: "#ff3d8b" }
+];
+
+export const colourOf = (options, value) =>
+  options.find((option) => option.value === value)?.colour ?? null;
+
 export const priceOf = (options, value) =>
   options.find((option) => option.value === value)?.price ?? 0;
 
