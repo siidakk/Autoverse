@@ -24,6 +24,8 @@ const AXIS_VECTORS = {
 // object and lose every method on it.
 const patched = new WeakMap();
 
+export const isWrapped = (material) => patched.has(material);
+
 export function applyWrap(material, options) {
   const {
     mode = "none",
@@ -62,9 +64,7 @@ export function applyWrap(material, options) {
   patched.set(material, uniforms);
 
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, uniforms);
-
-    shader.vertexShader = shader.vertexShader
+    const vertexShader = shader.vertexShader
       .replace(
         "#include <common>",
         "#include <common>\nvarying vec3 vWrapPos;"
@@ -74,7 +74,7 @@ export function applyWrap(material, options) {
         "#include <project_vertex>\nvWrapPos = (modelMatrix * vec4(transformed, 1.0)).xyz;"
       );
 
-    shader.fragmentShader = shader.fragmentShader
+    const fragmentShader = shader.fragmentShader
       .replace(
         "#include <common>",
         `#include <common>
@@ -98,9 +98,10 @@ export function applyWrap(material, options) {
 
           if (uWrapMode == 1) {
             // A pair of stripes over the centreline, front to back.
-            float half = uCarLength * 0.045;
-            float gap = uCarLength * 0.055;
-            covered = 1.0 - step(half, abs(abs(lateral) - gap));
+            // Note: "half" is a reserved word in GLSL and will not compile.
+            float stripeHalf = uCarLength * 0.045;
+            float stripeGap = uCarLength * 0.055;
+            covered = 1.0 - step(stripeHalf, abs(abs(lateral) - stripeGap));
           } else if (uWrapMode == 2) {
             // Everything above the waistline in the second colour.
             covered = step(uCarHeight * 0.58, up);
@@ -115,6 +116,23 @@ export function applyWrap(material, options) {
           diffuseColor.rgb = mix(diffuseColor.rgb, uWrapColour, covered);
         }`
       );
+
+    // If any anchor failed to match, the shader would end up declaring a
+    // varying the vertex stage never writes, which fails to link and takes the
+    // panel off screen entirely. Better to skip the wrap than lose the car.
+    const complete =
+      vertexShader.includes("vWrapPos =") &&
+      fragmentShader.includes("uniform int uWrapMode") &&
+      fragmentShader.includes("diffuseColor.rgb = mix");
+
+    if (!complete) {
+      console.warn("AutoVerse: wrap shader anchors not found, leaving material alone");
+      return;
+    }
+
+    Object.assign(shader.uniforms, uniforms);
+    shader.vertexShader = vertexShader;
+    shader.fragmentShader = fragmentShader;
   };
 
   // One key for every wrapped material: the mode is a uniform, so all of them

@@ -7,7 +7,7 @@ import Exhaust from "./accessories/Exhaust";
 import Headlights from "./accessories/Headlights";
 import Underglow from "./accessories/Underglow";
 import { inspectCar, detectWheels } from "../utils/carGeometry";
-import { applyWrap } from "../utils/wrapShader";
+import { applyWrap, isWrapped } from "../utils/wrapShader";
 
 // Every model arrives at a different scale and sitting at a different height,
 // so each one is normalised to the same length and stood on the floor.
@@ -175,15 +175,20 @@ export default function CarModel({
         material.clearcoatRoughness = 0.1;
       }
 
-      applyWrap(material, {
-        mode: wrap.mode,
-        colour: wrap.colour,
-        lengthAxis: car.lengthAxis,
-        widthAxis: car.widthAxis,
-        carLength: car.length * fit.scale,
-        carHeight: car.height * fit.scale,
-        groundY: 0
-      });
+      // Left alone unless a wrap is actually chosen. Patching a material's
+      // shader is the one thing here that can stop a panel drawing at all, so
+      // the default car runs on exactly the materials the model shipped with.
+      if (wrap.mode !== "none" || isWrapped(material)) {
+        applyWrap(material, {
+          mode: wrap.mode,
+          colour: wrap.colour,
+          lengthAxis: car.lengthAxis,
+          widthAxis: car.widthAxis,
+          carLength: car.length * fit.scale,
+          carHeight: car.height * fit.scale,
+          groundY: 0
+        });
+      }
 
       material.needsUpdate = true;
     });
