@@ -54,6 +54,35 @@ export const underglowOptions = [
   { value: "rose", label: "Rose", note: "Hot pink", price: 6500, colour: "#ff3d8b" }
 ];
 
+export const wrapOptions = [
+  { value: "none", label: "None", note: "Body colour only", price: 0 },
+  { value: "stripes", label: "Racing stripes", note: "Twin, nose to tail", price: 7500 },
+  { value: "roof", label: "Roof wrap", note: "Contrast roof", price: 5000 },
+  { value: "twoTone", label: "Two tone", note: "Split at the waist", price: 9000 },
+  { value: "split", label: "Half and half", note: "Front and rear", price: 8500 }
+];
+
+// Wrap colours are the ones people actually use for contrast panels.
+export const wrapColours = [
+  "#0c0d0f",
+  "#f4f6f8",
+  "#c0242c",
+  "#1b4fd8",
+  "#c8a227",
+  "#2b2f36"
+];
+
+// Visible light transmission, the way tint is actually sold.
+export const tintOptions = [
+  { value: "clear", label: "Clear", note: "Factory glass", price: 0, opacity: 0.32, colour: "#dfe6ee" },
+  { value: "light", label: "50%", note: "Light smoke", price: 2500, opacity: 0.5, colour: "#7d8894" },
+  { value: "dark", label: "20%", note: "Dark smoke", price: 3500, opacity: 0.72, colour: "#33383f" },
+  { value: "limo", label: "5%", note: "Limo black", price: 4500, opacity: 0.9, colour: "#141619" }
+];
+
+export const optionBy = (options, value) =>
+  options.find((option) => option.value === value) ?? options[0];
+
 export const colourOf = (options, value) =>
   options.find((option) => option.value === value)?.colour ?? null;
 

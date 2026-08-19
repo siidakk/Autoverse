@@ -111,6 +111,8 @@ export default function CarViewer({
   exhaustType,
   headlightType,
   underglow,
+  wrap,
+  tint,
   view
 }) {
   const controls = useRef(null);
@@ -148,6 +150,8 @@ export default function CarViewer({
           exhaustType={exhaustType}
           headlightType={headlightType}
           underglow={underglow}
+          wrap={wrap}
+          tint={tint}
         />
 
         <ShowroomLighting />

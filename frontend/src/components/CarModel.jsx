@@ -7,6 +7,7 @@ import Exhaust from "./accessories/Exhaust";
 import Headlights from "./accessories/Headlights";
 import Underglow from "./accessories/Underglow";
 import { inspectCar, detectWheels } from "../utils/carGeometry";
+import { applyWrap } from "../utils/wrapShader";
 
 // Every model arrives at a different scale and sitting at a different height,
 // so each one is normalised to the same length and stood on the floor.
@@ -22,7 +23,9 @@ export default function CarModel({
   stance = 0,
   exhaustType = "stock",
   headlightType = "stock",
-  underglow = null
+  underglow = null,
+  wrap = { mode: "none", colour: "#111111" },
+  tint = { colour: "#dfe6ee", opacity: 0.35 }
 }) {
 
   const { scene } = useGLTF(car.model);
@@ -91,39 +94,70 @@ export default function CarModel({
   }, [detected, wheelType]);
 
   useEffect(() => {
-    if (!scene) return;
+    if (!scene || !measurements) return;
 
     // Tyres and rims keep their own materials instead of taking body paint.
     const wheelMeshes = new Set(detected?.meshes ?? []);
+    const car = measurements.car;
 
     scene.traverse((child) => {
-      if (child.isMesh) {
+      if (!child.isMesh) return;
 
-        child.castShadow = true;
-        child.receiveShadow = true;
+      child.castShadow = true;
+      child.receiveShadow = true;
 
-        if (wheelMeshes.has(child)) return;
+      if (wheelMeshes.has(child)) return;
 
-        child.material = child.material.clone();
+      child.material = child.material.clone();
+      const material = child.material;
 
-        // BASE COLOR
-        child.material.color = new THREE.Color(color);
+      // Glazing is left out of the paint. Names are useless across this garage,
+      // so it is spotted by the one thing glass reliably is: see-through.
+      const looksLikeGlass =
+        material.transparent === true ||
+        material.opacity < 0.98 ||
+        (material.transmission ?? 0) > 0.1 ||
+        /glass|window|windscreen|windshield|glazing/i.test(
+          `${child.name} ${material.name ?? ""}`
+        );
 
-        // PAINT SYSTEM
-        child.material.metalness = paint.metalness;
-        child.material.roughness = paint.roughness;
-
-        // CLEARCOAT (if supported)
-        if ("clearcoat" in child.material) {
-          child.material.clearcoat = paint.clearcoat;
-          child.material.clearcoatRoughness = 0.1;
-        }
-
-        child.material.needsUpdate = true;
+      if (looksLikeGlass) {
+        material.transparent = true;
+        material.color = new THREE.Color(tint.colour);
+        material.opacity = tint.opacity;
+        material.roughness = 0.05;
+        material.metalness = 0;
+        material.needsUpdate = true;
+        return;
       }
+
+      // BASE COLOR
+      material.color = new THREE.Color(color);
+
+      // PAINT SYSTEM
+      material.metalness = paint.metalness;
+      material.roughness = paint.roughness;
+
+      // CLEARCOAT (if supported)
+      if ("clearcoat" in material) {
+        material.clearcoat = paint.clearcoat;
+        material.clearcoatRoughness = 0.1;
+      }
+
+      applyWrap(material, {
+        mode: wrap.mode,
+        colour: wrap.colour,
+        lengthAxis: car.lengthAxis,
+        widthAxis: car.widthAxis,
+        carLength: car.length * fit.scale,
+        carHeight: car.height * fit.scale,
+        groundY: 0
+      });
+
+      material.needsUpdate = true;
     });
 
-  }, [scene, color, paint, detected]);
+  }, [scene, color, paint, detected, measurements, fit.scale, wrap, tint]);
 
   return (
     <group scale={fit.scale} position={fit.position}>

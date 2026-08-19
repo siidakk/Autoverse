@@ -9,6 +9,9 @@ import {
   exhaustOptions,
   headlightOptions,
   underglowOptions,
+  wrapOptions,
+  wrapColours,
+  tintOptions,
   formatRupees
 } from "../../data/accessories";
 
@@ -216,6 +219,12 @@ export default function ControlPanel({
   setHeadlightType,
   underglow,
   setUnderglow,
+  wrapMode,
+  setWrapMode,
+  wrapColour,
+  setWrapColour,
+  tintLevel,
+  setTintLevel,
   total
 }) {
   const [tab, setTab] = useState("paint");
@@ -353,10 +362,43 @@ export default function ControlPanel({
               ))}
             </div>
 
+            {/* WRAP */}
+            <div className="space-y-2">
+              <p className="label mb-3">Wrap</p>
+              {wrapOptions.map((option) => (
+                <Choice
+                  key={option.value}
+                  option={option}
+                  selected={wrapMode === option.value}
+                  onSelect={setWrapMode}
+                />
+              ))}
+
+              {wrapMode !== "none" && (
+                <div className="pt-3">
+                  <p className="label">Wrap colour</p>
+                  <div className="mt-2 flex gap-2">
+                    {wrapColours.map((swatch) => (
+                      <button
+                        key={swatch}
+                        type="button"
+                        onClick={() => setWrapColour(swatch)}
+                        className={[
+                          "h-8 flex-1 border transition-transform hover:scale-105",
+                          wrapColour === swatch ? "border-signal" : "border-line-soft"
+                        ].join(" ")}
+                        style={{ background: swatch }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <p className="text-xs leading-relaxed text-fog">
-              Spoiler height is read off the boot lid by raycasting, and the
-              tips sit against the measured rear bumper, so both follow the car
-              instead of floating near it.
+              Spoiler height is read off the boot lid by raycasting, the tips
+              sit against the measured rear bumper, and wraps are drawn by the
+              material itself so they work on models with no usable UVs.
             </p>
           </div>
         )}
@@ -405,9 +447,36 @@ export default function ControlPanel({
               </div>
             </div>
 
+            {/* TINT */}
+            <div>
+              <p className="label mb-3">Window tint</p>
+              <div className="grid grid-cols-4 gap-px bg-line-soft">
+                {tintOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setTintLevel(option.value)}
+                    title={option.note}
+                    className={[
+                      "px-1 py-3 text-center transition-colors",
+                      tintLevel === option.value
+                        ? "bg-signal text-ink"
+                        : "bg-ink text-fog hover:text-chalk"
+                    ].join(" ")}
+                  >
+                    <span className="readout block text-[11px]">{option.label}</span>
+                    <span className="readout mt-0.5 block text-[9px] opacity-80">
+                      {option.price ? `+${option.price / 1000}k` : "—"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <p className="text-xs leading-relaxed text-fog">
               Beams aim out of whichever end the car's nose is, worked out from
-              the bodywork rather than set per model.
+              the bodywork rather than set per model. Glazing is picked out by
+              being see-through, since names vary across every model here.
             </p>
           </div>
         )}

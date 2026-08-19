@@ -11,8 +11,11 @@ import {
   exhaustOptions,
   headlightOptions,
   underglowOptions,
+  wrapOptions,
+  tintOptions,
   priceOf,
   colourOf,
+  optionBy,
   formatRupees
 } from "../data/accessories";
 import { CAMERA_VIEWS } from "../data/views";
@@ -79,6 +82,9 @@ export default function Showroom() {
   const [exhaustType, setExhaustType] = useState("stock");
   const [headlightType, setHeadlightType] = useState("stock");
   const [underglow, setUnderglow] = useState("off");
+  const [wrapMode, setWrapMode] = useState("none");
+  const [wrapColour, setWrapColour] = useState("#0c0d0f");
+  const [tintLevel, setTintLevel] = useState("clear");
   const [view, setView] = useState("hero");
 
   const [paint, setPaint] = useState({
@@ -107,6 +113,8 @@ export default function Showroom() {
     priceOf(exhaustOptions, exhaustType) +
     priceOf(headlightOptions, headlightType) +
     priceOf(underglowOptions, underglow) +
+    priceOf(wrapOptions, wrapMode) +
+    priceOf(tintOptions, tintLevel) +
     (aftermarket ? priceOf(wheelSizes, wheelSize) : 0) +
     (aftermarket ? priceOf(stanceLevels, stance) : 0);
 
@@ -128,6 +136,8 @@ export default function Showroom() {
           exhaustType={exhaustType}
           headlightType={headlightType}
           underglow={colourOf(underglowOptions, underglow)}
+          wrap={{ mode: wrapMode, colour: wrapColour }}
+          tint={optionBy(tintOptions, tintLevel)}
           view={view}
         />
 
@@ -195,6 +205,12 @@ export default function Showroom() {
         setHeadlightType={setHeadlightType}
         underglow={underglow}
         setUnderglow={setUnderglow}
+        wrapMode={wrapMode}
+        setWrapMode={setWrapMode}
+        wrapColour={wrapColour}
+        setWrapColour={setWrapColour}
+        tintLevel={tintLevel}
+        setTintLevel={setTintLevel}
         total={total}
       />
     </div>
