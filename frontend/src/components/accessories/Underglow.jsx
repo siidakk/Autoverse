@@ -31,7 +31,7 @@ function useSpillTexture() {
   }, []);
 }
 
-export default function Underglow({ colour, car, radius }) {
+export default function Underglow({ colour, car, wheels }) {
   const spill = useSpillTexture();
 
   if (!colour || !car) return null;
@@ -41,10 +41,17 @@ export default function Underglow({ colour, car, radius }) {
   const isLengthX = lengthAxis === "x";
   const alongCentre = center[lengthAxis];
 
-  // Just under the sills, level with the middle of the wheels.
-  const tubeHeight = box.min.y + (radius ? radius * 0.5 : height * 0.09);
-  const sillOffset = width * 0.32;
-  const thickness = width * 0.022;
+  // Measured off the wheels where possible. The bounding box includes mirrors
+  // and spoilers, which pushed the strips out past the sills.
+  const radius = wheels?.radius ?? height * 0.18;
+  const track = wheels?.track ?? width * 0.78;
+  const wheelbase = wheels?.wheelbase ?? length * 0.58;
+
+  // Tucked inboard of the wheels, low down under the sills.
+  const tubeHeight = box.min.y + radius * 0.42;
+  const sillOffset = track * 0.4;
+  const thickness = track * 0.025;
+  const tubeLength = wheelbase * 0.92;
 
   const place = (lateral, up) => {
     const position = [0, up, 0];
@@ -63,7 +70,7 @@ export default function Underglow({ colour, car, radius }) {
       {/* SILL TUBES */}
       {[sillOffset, -sillOffset].map((lateral) => (
         <mesh key={lateral} position={place(lateral, tubeHeight)}>
-          <boxGeometry args={barArgs(length * 0.6)} />
+          <boxGeometry args={barArgs(tubeLength)} />
           <meshBasicMaterial color={colour} toneMapped={false} />
         </mesh>
       ))}
@@ -76,8 +83,8 @@ export default function Underglow({ colour, car, radius }) {
         <planeGeometry
           args={
             isLengthX
-              ? [length * 1.3, width * 1.6]
-              : [width * 1.6, length * 1.3]
+              ? [length * 1.15, track * 2.2]
+              : [track * 2.2, length * 1.15]
           }
         />
         <meshBasicMaterial

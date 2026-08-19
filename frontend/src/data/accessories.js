@@ -72,9 +72,10 @@ export const wrapColours = [
   "#2b2f36"
 ];
 
-// Visible light transmission, the way tint is actually sold.
+// Visible light transmission, the way tint is actually sold. A null opacity
+// means leave the glazing exactly as the model shipped it.
 export const tintOptions = [
-  { value: "clear", label: "Clear", note: "Factory glass", price: 0, opacity: 0.32, colour: "#dfe6ee" },
+  { value: "clear", label: "Clear", note: "Factory glass", price: 0, opacity: null, colour: null },
   { value: "light", label: "50%", note: "Light smoke", price: 2500, opacity: 0.5, colour: "#7d8894" },
   { value: "dark", label: "20%", note: "Dark smoke", price: 3500, opacity: 0.72, colour: "#33383f" },
   { value: "limo", label: "5%", note: "Limo black", price: 4500, opacity: 0.9, colour: "#141619" }

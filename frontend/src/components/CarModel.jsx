@@ -120,25 +120,39 @@ export default function CarModel({
       // program per frame, which is what was tearing down the GL context.
       if (freshScene) {
         child.material = child.material.clone();
+
+        // How the panel arrived, so tinting can be judged against the original
+        // and undone rather than guessed at.
+        child.material.userData.baseOpacity = child.material.opacity;
+        child.material.userData.baseTransparent = child.material.transparent;
       }
 
       const material = child.material;
+      const base = material.userData;
 
-      // Glazing is left out of the paint. Names are useless across this garage,
-      // so it is spotted by the one thing glass reliably is: see-through.
-      const looksLikeGlass =
-        material.transparent === true ||
-        material.opacity < 0.98 ||
-        (material.transmission ?? 0) > 0.1 ||
-        /glass|window|windscreen|windshield|glazing/i.test(
-          `${child.name} ${material.name ?? ""}`
-        );
+      // Glazing has to be genuinely see-through to count. Plenty of exporters
+      // set the transparent flag on solid paint, and trusting it turned whole
+      // cars into ghosts.
+      const named = /glass|window|windscreen|windshield|glazing/i.test(
+        `${child.name} ${material.name ?? ""}`
+      );
 
-      if (looksLikeGlass) {
-        material.transparent = true;
-        material.color = new THREE.Color(tint.colour);
-        material.opacity = tint.opacity;
-        material.roughness = 0.05;
+      const translucent =
+        (base.baseTransparent === true && base.baseOpacity < 0.9) ||
+        (material.transmission ?? 0) > 0.1;
+
+      if (named || translucent) {
+        // Clear puts the glass back exactly as the model had it.
+        if (tint.opacity === null) {
+          material.transparent = base.baseTransparent;
+          material.opacity = base.baseOpacity;
+        } else {
+          material.transparent = true;
+          material.opacity = Math.max(base.baseOpacity, tint.opacity);
+          material.color = new THREE.Color(tint.colour);
+        }
+
+        material.roughness = 0.06;
         material.metalness = 0;
         material.needsUpdate = true;
         return;
@@ -215,7 +229,7 @@ export default function CarModel({
       <Underglow
         colour={underglow}
         car={measurements?.car}
-        radius={detected?.radius}
+        wheels={detected}
       />
 
       <Wheels
