@@ -19,16 +19,21 @@ import { CAMERA_VIEWS } from "../data/views";
 // The room this builds is what the car reflects, so it cannot be as dark as the
 // page around it. A black room reflected in the paint is a black car, whatever
 // colour was picked.
-function ShowroomLighting() {
+function ShowroomLighting({ stage }) {
+  const { panel, panelIntensity } = stage;
+
   return (
-    <Environment resolution={256} frames={1}>
-      <color attach="background" args={["#5c626b"]} />
+    // Keyed on the scene so switching rebuilds the reflection map rather than
+    // leaving the previous room hanging in the paint.
+    <Environment key={stage.id} resolution={256} frames={1}>
+      <color attach="background" args={[stage.room]} />
 
       {/* CEILING STRIPS */}
       {[-4, -1.5, 1.5, 4].map((x) => (
         <Lightformer
           key={x}
-          intensity={5}
+          color={panel}
+          intensity={panelIntensity}
           position={[x, 5, -1]}
           rotation={[Math.PI / 2, 0, 0]}
           scale={[2, 12, 1]}
@@ -37,13 +42,15 @@ function ShowroomLighting() {
 
       {/* SIDE FILL */}
       <Lightformer
-        intensity={4}
+        color={panel}
+        intensity={panelIntensity * 0.8}
         position={[-8, 3, 2]}
         rotation={[0, Math.PI / 2, 0]}
         scale={[10, 8, 1]}
       />
       <Lightformer
-        intensity={3}
+        color={panel}
+        intensity={panelIntensity * 0.6}
         position={[8, 3, 2]}
         rotation={[0, -Math.PI / 2, 0]}
         scale={[10, 8, 1]}
@@ -51,14 +58,16 @@ function ShowroomLighting() {
 
       {/* RIM LIGHT FROM BEHIND */}
       <Lightformer
-        intensity={3.5}
+        color={stage.rim.colour}
+        intensity={panelIntensity * 0.7}
         position={[0, 2, -8]}
         scale={[14, 6, 1]}
       />
 
       {/* BOUNCE OFF THE FLOOR, WHICH KEEPS THE SILLS OFF BLACK */}
       <Lightformer
-        intensity={1.4}
+        color={panel}
+        intensity={panelIntensity * 0.28}
         position={[0, -3, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
         scale={[14, 14, 1]}
@@ -67,22 +76,25 @@ function ShowroomLighting() {
   );
 }
 
-function ShowroomFloor() {
+function ShowroomFloor({ stage }) {
+  const { floor } = stage;
+
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
       <planeGeometry args={[60, 60]} />
       <MeshReflectorMaterial
+        key={stage.id}
         resolution={1024}
-        mirror={0.45}
-        blur={[400, 100]}
+        mirror={floor.mirror}
+        blur={floor.blur}
         mixBlur={1.2}
         mixStrength={2.2}
         depthScale={1.1}
         minDepthThreshold={0.4}
         maxDepthThreshold={1.4}
-        color="#15171b"
-        metalness={0.65}
-        roughness={0.85}
+        color={floor.colour}
+        metalness={floor.metalness}
+        roughness={floor.roughness}
       />
     </mesh>
   );
@@ -135,7 +147,8 @@ export default function CarViewer({
   tint,
   decals,
   onPlaceDecal,
-  view
+  view,
+  stage
 }) {
   const controls = useRef(null);
 
@@ -145,23 +158,32 @@ export default function CarViewer({
       dpr={[1, 2]}
       camera={{ position: [5.2, 1.9, 6.4], fov: 40 }}
     >
-      <color attach="background" args={["#0a0b0e"]} />
-      <fog attach="fog" args={["#0a0b0e", 18, 42]} />
+      <color attach="background" args={[stage.background]} />
+      <fog attach="fog" args={stage.fog} />
 
-      <ambientLight intensity={0.7} />
+      <ambientLight intensity={stage.ambient} />
 
       <spotLight
-        position={[6, 9, 6]}
+        position={stage.key.position}
+        color={stage.key.colour}
         angle={0.6}
         penumbra={0.8}
-        intensity={40}
+        intensity={stage.key.intensity}
         distance={40}
         decay={1.4}
         castShadow
         shadow-mapSize={[2048, 2048]}
       />
-      <directionalLight position={[-6, 6, -4]} intensity={1.4} />
-      <directionalLight position={[4, 3, -6]} intensity={0.8} />
+      <directionalLight
+        position={stage.fill.position}
+        color={stage.fill.colour}
+        intensity={stage.fill.intensity}
+      />
+      <directionalLight
+        position={stage.rim.position}
+        color={stage.rim.colour}
+        intensity={stage.rim.intensity}
+      />
 
       <Suspense fallback={null}>
         <CarModel
@@ -186,16 +208,17 @@ export default function CarViewer({
           revision={`${car.model}-${stance}-${wheelType}`}
         />
 
-        <ShowroomLighting />
+        <ShowroomLighting stage={stage} />
       </Suspense>
 
       <CameraRig view={view} controls={controls} />
 
-      <ShowroomFloor />
+      <ShowroomFloor stage={stage} />
 
+      {/* Softer on a white floor, where a hard black pool would look wrong */}
       <ContactShadows
         position={[0, 0.01, 0]}
-        opacity={0.7}
+        opacity={stage.light ? 0.45 : 0.7}
         scale={16}
         blur={2.4}
         far={4}

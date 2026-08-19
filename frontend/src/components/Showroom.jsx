@@ -22,6 +22,7 @@ import {
   formatRupees
 } from "../data/accessories";
 import { CAMERA_VIEWS } from "../data/views";
+import { SCENES, sceneById } from "../data/scenes";
 import { loadBuild } from "../lib/api";
 
 function CarList({ selected, onSelect }) {
@@ -90,7 +91,10 @@ export default function Showroom() {
   const [wrapColour, setWrapColour] = useState("#0c0d0f");
   const [tintLevel, setTintLevel] = useState("clear");
   const [view, setView] = useState("hero");
+  const [stageId, setStageId] = useState("studio");
   const [comparing, setComparing] = useState(false);
+
+  const stage = sceneById(stageId);
   const [decals, setDecals] = useState([]);
   const [decalDesign, setDecalDesign] = useState(null);
 
@@ -290,30 +294,58 @@ export default function Showroom() {
           decals={comparing ? [] : decals}
           onPlaceDecal={decalDesign ? placeDecal : null}
           view={view}
+          stage={stage}
         />
 
         <ViewportLoader car={selectedCar} />
 
-        {/* CAMERA PRESETS */}
-        <div className="absolute top-5 right-5 z-10 flex gap-px bg-line-soft">
-          {CAMERA_VIEWS.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              onClick={() => setView(preset.id)}
-              className={[
-                "px-3 py-2 text-[10px] tracking-widest uppercase transition-colors",
-                view === preset.id
-                  ? "bg-signal text-ink"
-                  : "bg-ink/80 text-fog hover:text-chalk"
-              ].join(" ")}
-            >
-              {preset.label}
-            </button>
-          ))}
+        {/* SCENE AND CAMERA */}
+        <div className="absolute top-5 right-5 z-10 flex flex-col items-end gap-2">
+          <div className="flex gap-px bg-line-soft">
+            {SCENES.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setStageId(option.id)}
+                title={option.note}
+                className={[
+                  "px-3 py-2 text-[10px] tracking-widest uppercase transition-colors",
+                  stageId === option.id
+                    ? "bg-signal text-ink"
+                    : "bg-ink/80 text-fog hover:text-chalk"
+                ].join(" ")}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex gap-px bg-line-soft">
+            {CAMERA_VIEWS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => setView(preset.id)}
+                className={[
+                  "px-3 py-2 text-[10px] tracking-widest uppercase transition-colors",
+                  view === preset.id
+                    ? "bg-signal text-ink"
+                    : "bg-ink/80 text-fog hover:text-chalk"
+                ].join(" ")}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="pointer-events-none absolute inset-0 p-5">
+        {/* Readouts flip to dark type on the bright scenes */}
+        <div
+          className={[
+            "pointer-events-none absolute inset-0 p-5",
+            stage.light ? "text-ink [&_.label]:text-ink/70" : ""
+          ].join(" ")}
+        >
           <div className="hud-frame h-full w-full">
             <div className="absolute top-0 left-0">
               <p className="readout text-lg tracking-tight">{selectedCar.name}</p>
