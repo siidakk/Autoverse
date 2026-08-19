@@ -5,6 +5,7 @@ import { useProgress, useGLTF } from "@react-three/drei";
 import HeroScene from "../components/home/HeroScene";
 import { HERO_SEQUENCE } from "../components/home/heroSequence";
 import { cars } from "../data/cars";
+import { finishes, totalShades } from "../data/paint";
 
 const DISPLAY_MS = 5600;
 const FADE_MS = 700;
@@ -98,8 +99,8 @@ const capabilities = [
 ];
 
 const steps = [
-  { index: "01", title: "Choose a platform", body: "Six models, normalised to a common scale and stood on the floor." },
-  { index: "02", title: "Build the spec", body: "Ninety paint shades, three finishes, wheel and spoiler options with live pricing." },
+  { index: "01", title: "Choose a platform", body: "Every model normalised to a common scale and stood on the floor." },
+  { index: "02", title: "Build the spec", body: "Dozens of paint shades, three finishes, wheel and spoiler options with live pricing." },
   { index: "03", title: "Let the model match you", body: "Feed your numbers to the recommender and compare what comes back." }
 ];
 
@@ -256,9 +257,9 @@ export default function HomePage() {
               className="mt-16 flex flex-wrap gap-x-12 gap-y-6"
             >
               {[
-                ["Models", "06"],
-                ["Paint shades", "90"],
-                ["Finishes", "03"],
+                ["Models", String(cars.length).padStart(2, "0")],
+                ["Paint shades", String(totalShades)],
+                ["Finishes", String(Object.keys(finishes).length).padStart(2, "0")],
                 ["Matches returned", "05"]
               ].map(([label, value]) => (
                 <div key={label}>
@@ -332,7 +333,7 @@ export default function HomePage() {
             <div>
               <p className="label">In the garage</p>
               <h2 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">
-                Six platforms, one configurator.
+                {cars.length} platforms, one configurator.
               </h2>
             </div>
             <Link to="/configure" className="btn btn-ghost">
@@ -356,9 +357,7 @@ export default function HomePage() {
                 </div>
 
                 <div className="flex items-center gap-6">
-                  <span className="label hidden sm:block">
-                    {car.finishes.length} finishes
-                  </span>
+                  <span className="label hidden sm:block">{car.bodyStyle}</span>
                   <span className="text-fog transition-colors group-hover:text-signal">→</span>
                 </div>
               </Link>
