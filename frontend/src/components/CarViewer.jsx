@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import {
@@ -12,6 +12,7 @@ import {
 import Decals from "./accessories/Decals";
 import CarModel from "./CarModel";
 import { CAMERA_VIEWS } from "../data/views";
+import { loadHdri } from "../data/scenes";
 
 // Studio softboxes built in code rather than an HDR file, so the showroom needs
 // no extra assets and still gives the paint something to reflect.
@@ -19,6 +20,38 @@ import { CAMERA_VIEWS } from "../data/views";
 // The room this builds is what the car reflects, so it cannot be as dark as the
 // page around it. A black room reflected in the paint is a black car, whatever
 // colour was picked.
+// A captured environment, projected onto a dome so the car stands in the scene
+// rather than floating in front of a picture of it.
+function CapturedEnvironment({ stage }) {
+  // The map is stored with the scene it belongs to, so a slow load can never
+  // hang the previous environment behind the new one.
+  const [loaded, setLoaded] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    loadHdri(stage.hdri).then((url) => {
+      if (!cancelled) setLoaded({ id: stage.id, url });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [stage.hdri, stage.id]);
+
+  if (loaded?.id !== stage.id) return null;
+
+  return (
+    <Environment
+      key={stage.id}
+      files={loaded.url}
+      background
+      ground={stage.ground}
+      environmentIntensity={stage.environmentIntensity ?? 1}
+    />
+  );
+}
+
 function ShowroomLighting({ stage }) {
   const { panel, panelIntensity } = stage;
 
@@ -158,8 +191,10 @@ export default function CarViewer({
       dpr={[1, 2]}
       camera={{ position: [5.2, 1.9, 6.4], fov: 40 }}
     >
+      {/* Shown until the captured environment has loaded, and kept for good in
+          the studio, which has no photograph behind it. */}
       <color attach="background" args={[stage.background]} />
-      <fog attach="fog" args={stage.fog} />
+      {stage.fog && <fog attach="fog" args={stage.fog} />}
 
       <ambientLight intensity={stage.ambient} />
 
@@ -174,16 +209,22 @@ export default function CarViewer({
         castShadow
         shadow-mapSize={[2048, 2048]}
       />
-      <directionalLight
-        position={stage.fill.position}
-        color={stage.fill.colour}
-        intensity={stage.fill.intensity}
-      />
-      <directionalLight
-        position={stage.rim.position}
-        color={stage.rim.colour}
-        intensity={stage.rim.intensity}
-      />
+
+      {stage.fill && (
+        <directionalLight
+          position={stage.fill.position}
+          color={stage.fill.colour}
+          intensity={stage.fill.intensity}
+        />
+      )}
+
+      {stage.rim && (
+        <directionalLight
+          position={stage.rim.position}
+          color={stage.rim.colour}
+          intensity={stage.rim.intensity}
+        />
+      )}
 
       <Suspense fallback={null}>
         <CarModel
@@ -208,12 +249,17 @@ export default function CarViewer({
           revision={`${car.model}-${stance}-${wheelType}`}
         />
 
-        <ShowroomLighting stage={stage} />
+        {stage.hdri ? (
+          <CapturedEnvironment stage={stage} />
+        ) : (
+          <ShowroomLighting stage={stage} />
+        )}
       </Suspense>
 
       <CameraRig view={view} controls={controls} />
 
-      <ShowroomFloor stage={stage} />
+      {/* The captured scenes bring their own ground with them */}
+      {!stage.hdri && <ShowroomFloor stage={stage} />}
 
       {/* Softer on a white floor, where a hard black pool would look wrong */}
       <ContactShadows

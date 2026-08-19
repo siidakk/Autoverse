@@ -1,15 +1,34 @@
-// The room the car sits in. Each scene sets what the paint reflects, what the
-// floor does with it, and how the whole thing is lit, because those three
-// together are what actually change the look of a car.
+// The room the car sits in. What the paint reflects is most of what a car
+// looks like, so these are real captured environments rather than a handful of
+// light panels pretending to be one. Only the studio is built by hand, because
+// a seamless grey cyclorama is the one "room" that has no photograph.
 //
-// `light` marks the scenes bright enough that the readouts over the viewport
-// have to switch to dark text.
+// The maps ship as base64 inside @pmndrs/assets, so nothing is fetched from a
+// CDN at runtime. They are imported on demand so only the chosen one loads.
+//
+// `light` marks scenes bright enough that the readouts over the viewport have
+// to switch to dark text.
+
+const hdriLoaders = {
+  city: () => import("@pmndrs/assets/hdri/city.exr"),
+  sunset: () => import("@pmndrs/assets/hdri/sunset.exr"),
+  night: () => import("@pmndrs/assets/hdri/night.exr"),
+  warehouse: () => import("@pmndrs/assets/hdri/warehouse.exr")
+};
+
+export const loadHdri = async (name) => {
+  const loader = hdriLoaders[name];
+  if (!loader) return null;
+
+  const module = await loader();
+  return module.default;
+};
 
 export const SCENES = [
   {
     id: "studio",
     label: "Studio",
-    note: "Neutral grey, reflective floor",
+    note: "Neutral cyclorama, reflective floor",
     background: "#0a0b0e",
     fog: ["#0a0b0e", 18, 42],
     ambient: 0.7,
@@ -28,89 +47,49 @@ export const SCENES = [
     }
   },
   {
-    id: "showroom",
-    label: "Showroom",
-    note: "White cyclorama, product lighting",
-    background: "#e6e9ed",
-    fog: ["#e6e9ed", 26, 60],
-    ambient: 1.6,
-    key: { position: [6, 10, 6], intensity: 55, colour: "#ffffff" },
-    fill: { position: [-7, 6, -3], intensity: 2.4, colour: "#ffffff" },
-    rim: { position: [3, 4, -7], intensity: 1.6, colour: "#ffffff" },
-    room: "#ffffff",
-    panel: "#ffffff",
-    panelIntensity: 6,
+    id: "city",
+    label: "City",
+    note: "Urban daylight, open sky",
+    hdri: "city",
+    background: "#9aa6b4",
     light: true,
-    floor: {
-      colour: "#c9ced5",
-      metalness: 0.3,
-      roughness: 0.7,
-      mirror: 0.35,
-      blur: [300, 90]
-    }
-  },
-  {
-    id: "night",
-    label: "Night",
-    note: "Cold rim light, wet asphalt",
-    background: "#04050a",
-    fog: ["#04050a", 14, 34],
     ambient: 0.25,
-    key: { position: [5, 8, 4], intensity: 22, colour: "#cfe0ff" },
-    fill: { position: [-7, 4, -5], intensity: 1.6, colour: "#4f7dff" },
-    rim: { position: [3, 2, -7], intensity: 2.2, colour: "#7b5bff" },
-    room: "#1a2030",
-    panel: "#9fc0ff",
-    panelIntensity: 4,
-    floor: {
-      colour: "#080a10",
-      metalness: 0.9,
-      roughness: 0.35,
-      mirror: 0.85,
-      blur: [200, 60]
-    }
+    environmentIntensity: 1,
+    key: { position: [7, 10, 5], intensity: 22, colour: "#fff6e8" },
+    ground: { height: 6, radius: 55, scale: 70 }
   },
   {
     id: "sunset",
     label: "Sunset",
-    note: "Low warm key, long shadows",
-    background: "#1a1014",
-    fog: ["#241318", 16, 40],
-    ambient: 0.5,
-    key: { position: [8, 3.5, 4], intensity: 45, colour: "#ffb066" },
-    fill: { position: [-6, 5, -4], intensity: 1.2, colour: "#7a5cff" },
-    rim: { position: [-3, 2, -7], intensity: 2, colour: "#ff7a3d" },
-    room: "#6b4436",
-    panel: "#ffc48a",
-    panelIntensity: 5,
-    floor: {
-      colour: "#211519",
-      metalness: 0.55,
-      roughness: 0.75,
-      mirror: 0.5,
-      blur: [350, 90]
-    }
+    note: "Low sun, long shadows",
+    hdri: "sunset",
+    background: "#42332e",
+    ambient: 0.2,
+    environmentIntensity: 1.15,
+    key: { position: [9, 3, 3], intensity: 26, colour: "#ffb066" },
+    ground: { height: 5, radius: 50, scale: 65 }
   },
   {
-    id: "concrete",
-    label: "Concrete",
-    note: "Industrial, matte floor",
-    background: "#16181b",
-    fog: ["#16181b", 20, 46],
-    ambient: 0.9,
-    key: { position: [5, 8, 5], intensity: 32, colour: "#f2f4f7" },
-    fill: { position: [-6, 5, -4], intensity: 1.5, colour: "#c8d2dd" },
-    rim: { position: [4, 3, -6], intensity: 0.9, colour: "#ffffff" },
-    room: "#7b828c",
-    panel: "#ffffff",
-    panelIntensity: 4.5,
-    floor: {
-      colour: "#31353a",
-      metalness: 0.15,
-      roughness: 0.95,
-      mirror: 0.12,
-      blur: [500, 140]
-    }
+    id: "night",
+    label: "Night",
+    note: "City lights after dark",
+    hdri: "night",
+    background: "#05070c",
+    ambient: 0.12,
+    environmentIntensity: 1.4,
+    key: { position: [5, 7, 4], intensity: 10, colour: "#cfe0ff" },
+    ground: { height: 5, radius: 45, scale: 60 }
+  },
+  {
+    id: "warehouse",
+    label: "Warehouse",
+    note: "Industrial interior",
+    hdri: "warehouse",
+    background: "#2b2b2b",
+    ambient: 0.2,
+    environmentIntensity: 1.1,
+    key: { position: [4, 8, 5], intensity: 18, colour: "#f0eee8" },
+    ground: { height: 4, radius: 35, scale: 45 }
   }
 ];
 

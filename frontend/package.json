@@ -12,6 +12,7 @@
     "compress:models": "node tools/compress-models.mjs public/models --replace"
   },
   "dependencies": {
+    "@pmndrs/assets": "^1.7.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "axios": "^1.16.1",
