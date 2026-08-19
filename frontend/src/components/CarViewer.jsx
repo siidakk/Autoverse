@@ -95,6 +95,27 @@ function DecalLayer({ car, decals, revision }) {
   return <Decals decals={decals} scene={scene} revision={revision} />;
 }
 
+// Development only: publishes what the renderer is actually doing, so a blank
+// viewport can be told apart from a car that is off camera or unlit.
+function RenderProbe() {
+  const { camera, gl, scene } = useThree();
+
+  useFrame(() => {
+    if (!import.meta.env.DEV) return;
+
+    window.__render = {
+      camera: [camera.position.x, camera.position.y, camera.position.z],
+      triangles: gl.info.render.triangles,
+      calls: gl.info.render.calls,
+      programs: gl.info.programs?.length ?? 0,
+      hasEnvironment: !!scene.environment,
+      toneMappingExposure: gl.toneMappingExposure
+    };
+  });
+
+  return null;
+}
+
 // Glides the camera to a preset instead of snapping, and hands control straight
 // back so the user can keep dragging.
 function CameraRig({ view, controls }) {
@@ -193,6 +214,8 @@ export default function CarViewer({
       </Suspense>
 
       <CameraRig view={view} controls={controls} />
+
+      <RenderProbe />
 
       <ShowroomFloor />
 

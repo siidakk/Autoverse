@@ -5,6 +5,7 @@ import { finishes } from "../data/paint";
 import CarViewer from "./CarViewer";
 import ControlPanel from "./configurator/ControlPanel";
 import ViewportLoader from "./configurator/ViewportLoader";
+import RenderStats from "./configurator/RenderStats";
 import {
   wheelOptions,
   spoilerOptions,
@@ -293,6 +294,7 @@ export default function Showroom() {
         />
 
         <ViewportLoader car={selectedCar} />
+        <RenderStats />
 
         {/* CAMERA PRESETS */}
         <div className="absolute top-5 right-5 z-10 flex gap-px bg-line-soft">
