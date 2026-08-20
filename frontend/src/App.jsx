@@ -7,10 +7,14 @@ import RecommendPage from "./pages/RecommendPage";
 import ValuationPage from "./pages/ValuationPage";
 import DetectPage from "./pages/DetectPage";
 import DamagePage from "./pages/DamagePage";
+import AccountPage from "./pages/AccountPage";
+import GaragePage from "./pages/GaragePage";
+import { AuthProvider } from "./lib/auth";
 
 function App() {
   return (
-    <BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
       <Routes>
         <Route element={<SiteLayout />}>
 
@@ -26,6 +30,10 @@ function App() {
 
           <Route path="/damage" element={<DamagePage />} />
 
+          <Route path="/account" element={<AccountPage />} />
+
+          <Route path="/garage" element={<GaragePage />} />
+
           {/* The configurator used to live at the root */}
           <Route path="/showroom" element={<Navigate to="/configure" replace />} />
 
@@ -33,7 +41,8 @@ function App() {
 
         </Route>
       </Routes>
-    </BrowserRouter>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

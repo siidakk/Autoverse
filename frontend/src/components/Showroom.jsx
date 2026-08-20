@@ -24,6 +24,7 @@ import {
 import { CAMERA_VIEWS } from "../data/views";
 import { SCENES, sceneById } from "../data/scenes";
 import { loadBuild } from "../lib/api";
+import { noteViewed } from "../lib/recent";
 
 function CarList({ selected, onSelect }) {
   return (
@@ -104,6 +105,11 @@ export default function Showroom() {
   const [comparing, setComparing] = useState(false);
 
   const stage = sceneById(stageId);
+
+  // Remembered on this device so the garage can offer a way back to it.
+  useEffect(() => {
+    noteViewed(selectedCar);
+  }, [selectedCar]);
   const [decals, setDecals] = useState([]);
   const [decalDesign, setDecalDesign] = useState(null);
 
@@ -253,6 +259,25 @@ export default function Showroom() {
     () => colourOf(underglowOptions, shown.underglow),
     [shown.underglow]
   );
+
+  // A theme arrives as a whole specification, so every setting moves together
+  // rather than the user changing eleven controls by hand.
+  const applyTheme = useCallback((spec) => {
+    if (spec.color) setColor(spec.color);
+    if (spec.finish) applyFinish(spec.finish);
+    if (spec.wheelType) setWheelType(spec.wheelType);
+    if (spec.wheelSize !== undefined) setWheelSize(spec.wheelSize);
+    if (spec.stance !== undefined) setStance(spec.stance);
+    if (spec.spoilerType) setSpoilerType(spec.spoilerType);
+    if (spec.exhaustType) setExhaustType(spec.exhaustType);
+    if (spec.headlightType) setHeadlightType(spec.headlightType);
+    if (spec.underglow) setUnderglow(spec.underglow);
+    if (spec.wrapMode) setWrapMode(spec.wrapMode);
+    if (spec.wrapColour) setWrapColour(spec.wrapColour);
+    if (spec.tintLevel) setTintLevel(spec.tintLevel);
+    // The room is part of the look, so a night theme brings the night with it.
+    if (spec.stage) setStageId(spec.stage);
+  }, [applyFinish]);
 
   const buildPayload = useCallback(
     () => ({
@@ -413,6 +438,7 @@ export default function Showroom() {
         comparing={comparing}
         setComparing={setComparing}
         changes={changes}
+        onApplyTheme={applyTheme}
         decals={decals}
         decalDesign={decalDesign}
         setDecalDesign={setDecalDesign}

@@ -40,6 +40,7 @@ export default function SiteFooter() {
             <Link to="/value" className="w-fit hover:text-signal">Valuation</Link>
             <Link to="/detect" className="w-fit hover:text-signal">From a photo</Link>
             <Link to="/damage" className="w-fit hover:text-signal">Damage</Link>
+            <Link to="/garage" className="w-fit hover:text-signal">My garage</Link>
           </div>
         </div>
 

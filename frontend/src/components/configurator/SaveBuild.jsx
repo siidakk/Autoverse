@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { saveBuild, describeError } from "../../lib/api";
+import { useAuth } from "../../lib/authContext";
 
 // Saving hands back a short code rather than needing an account, which is
 // enough to reopen a build or pass it to somebody else.
 export default function SaveBuild({ buildPayload, onSaved }) {
+  const { user, authHeader } = useAuth();
   const [state, setState] = useState("idle");
   const [code, setCode] = useState(null);
   const [error, setError] = useState(null);
@@ -19,7 +21,7 @@ export default function SaveBuild({ buildPayload, onSaved }) {
     setCopied(false);
 
     try {
-      const result = await saveBuild(buildPayload());
+      const result = await saveBuild(buildPayload(), authHeader);
       setCode(result.code);
       setState("saved");
       onSaved?.(result.code);
@@ -49,6 +51,10 @@ export default function SaveBuild({ buildPayload, onSaved }) {
       >
         {state === "saving" ? "Saving…" : "Save this build"}
       </button>
+
+      {code && user && (
+        <p className="mt-2 text-[11px] text-fog">Saved to your garage.</p>
+      )}
 
       {code && (
         <div className="mt-3 border border-line-soft bg-ink px-4 py-3">

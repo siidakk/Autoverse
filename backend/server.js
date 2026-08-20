@@ -44,6 +44,10 @@ const buildsRoute = require("./routes/builds")
 
 app.use("/builds", buildsRoute)
 
+const authRoute = require("./routes/auth")
+
+app.use("/auth", authRoute)
+
 const valuationRoute = require("./routes/valuation")
 
 app.use("/valuation", valuationRoute)

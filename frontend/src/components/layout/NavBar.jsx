@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
+import { useAuth } from "../../lib/authContext";
 
 const links = [
   { to: "/", label: "Home", index: "00" },
@@ -12,6 +13,7 @@ const links = [
 
 export default function NavBar() {
   const [open, setOpen] = useState(false);
+  const { user } = useAuth();
 
   const linkClass = ({ isActive }) =>
     [
@@ -41,7 +43,13 @@ export default function NavBar() {
           ))}
         </nav>
 
-        <div className="hidden md:block">
+        <div className="hidden items-center gap-3 md:flex">
+          <Link
+            to={user ? "/garage" : "/account"}
+            className="label hover:text-signal"
+          >
+            {user ? (user.name || "Garage") : "Sign in"}
+          </Link>
           <Link to="/configure" className="btn btn-signal">
             Start Build
           </Link>

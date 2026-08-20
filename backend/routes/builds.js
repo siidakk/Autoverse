@@ -2,6 +2,7 @@ const express = require("express")
 const mongoose = require("mongoose")
 
 const Build = require("../models/Build")
+const { requireAuth, optionalAuth } = require("../middleware/auth")
 
 const router = express.Router()
 
@@ -29,7 +30,7 @@ function requireDatabase(req, res, next) {
 }
 
 // Save a build and hand back the code it can be reached by.
-router.post("/", requireDatabase, async (req, res) => {
+router.post("/", requireDatabase, optionalAuth, async (req, res) => {
 
   const { carId, carName, spec, total } = req.body
 
@@ -51,7 +52,8 @@ router.post("/", requireDatabase, async (req, res) => {
         carId,
         carName,
         spec: spec || {},
-        total: total || 0
+        total: total || 0,
+        owner: req.user ? req.user.sub : null
       })
 
       return res.status(201).json({ code: build.code })
@@ -63,6 +65,62 @@ router.post("/", requireDatabase, async (req, res) => {
     console.error("Failed to save build", error)
     res.status(500).json({ error: "Could not save this build." })
   }
+})
+
+// Everything this account has saved. Declared before the code route below,
+// otherwise "mine" is taken for a share code and looked up as one.
+router.get("/mine", requireDatabase, requireAuth, async (req, res) => {
+
+  try {
+
+    const builds = await Build.find({ owner: req.user.sub })
+      .sort({ createdAt: -1 })
+      .limit(60)
+
+    res.json({
+      builds: builds.map((build) => ({
+        code: build.code,
+        carId: build.carId,
+        carName: build.carName,
+        spec: build.spec,
+        total: build.total,
+        views: build.views,
+        savedAt: build.createdAt
+      }))
+    })
+
+  }
+
+  catch (error) {
+    console.error("Failed to list builds", error)
+    res.status(500).json({ error: "Could not load your garage." })
+  }
+
+})
+
+// Remove one of your own builds.
+router.delete("/:code", requireDatabase, requireAuth, async (req, res) => {
+
+  try {
+
+    const removed = await Build.findOneAndDelete({
+      code: req.params.code.toUpperCase(),
+      owner: req.user.sub
+    })
+
+    if (!removed) {
+      return res.status(404).json({ error: "No build of yours with that code." })
+    }
+
+    res.json({ removed: removed.code })
+
+  }
+
+  catch (error) {
+    console.error("Failed to remove build", error)
+    res.status(500).json({ error: "Could not remove that build." })
+  }
+
 })
 
 // Load a build by its share code.

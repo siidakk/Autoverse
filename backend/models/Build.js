@@ -12,6 +12,15 @@ const buildSchema = new mongoose.Schema(
       index: true
     },
 
+    // Set when the build was saved by somebody signed in. Anonymous builds
+    // keep working exactly as before, reachable by their code alone.
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true
+    },
+
     carId: {
       type: Number,
       required: true

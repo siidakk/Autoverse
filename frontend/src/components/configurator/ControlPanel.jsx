@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { paintFamilies, finishes } from "../../data/paint";
 import SaveBuild from "./SaveBuild";
 import CompareToggle from "./CompareToggle";
+import DesignAssistant from "./DesignAssistant";
 import {
   wheelOptions,
   spoilerOptions,
@@ -19,6 +20,7 @@ import {
 } from "../../data/accessories";
 
 const TABS = [
+  { id: "assistant", label: "Assistant" },
   { id: "paint", label: "Paint" },
   { id: "wheels", label: "Wheels" },
   { id: "body", label: "Body" },
@@ -235,6 +237,7 @@ export default function ControlPanel({
   comparing,
   setComparing,
   changes,
+  onApplyTheme,
   decals,
   decalDesign,
   setDecalDesign,
@@ -257,7 +260,7 @@ export default function ControlPanel({
       </div>
 
       {/* TABS */}
-      <div className="grid shrink-0 grid-cols-3 gap-px border-b border-line-soft bg-line-soft">
+      <div className="grid shrink-0 grid-cols-5 gap-px border-b border-line-soft bg-line-soft">
         {TABS.map((entry) => (
           <button
             key={entry.id}
@@ -277,6 +280,8 @@ export default function ControlPanel({
 
       {/* CONTENT */}
       <div className="flex-1 overflow-y-auto px-5 py-6">
+        {tab === "assistant" && <DesignAssistant onApply={onApplyTheme} />}
+
         {tab === "paint" && (
           <PaintTab
             color={color}

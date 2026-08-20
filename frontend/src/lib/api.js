@@ -68,8 +68,8 @@ export async function valueCar(details) {
   }
 }
 
-export async function saveBuild(payload) {
-  const { data } = await client.post("/builds", payload);
+export async function saveBuild(payload, headers = {}) {
+  const { data } = await client.post("/builds", payload, { headers });
   return data;
 }
 
