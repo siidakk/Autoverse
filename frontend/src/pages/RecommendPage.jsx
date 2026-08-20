@@ -2,16 +2,47 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import MLPanel from "../components/MLPanel";
+import { matchGarageCar } from "../data/garageMatch";
 
-const formatUsd = (value) =>
-  typeof value === "number" ? `$${value.toLocaleString("en-US")}` : "—";
+const lakh = (value) =>
+  value >= 100000
+    ? `₹${(value / 100000).toFixed(value >= 1000000 ? 1 : 2)} L`
+    : `₹${value.toLocaleString("en-IN")}`;
+
+const VERDICTS = {
+  under: { label: "Priced under", tone: "text-data" },
+  fair: { label: "Priced fairly", tone: "text-fog" },
+  over: { label: "Priced over", tone: "text-signal" }
+};
+
+// The parts the recommender suggests, pointed at the configurator so a
+// suggestion can be looked at rather than just read.
+function Accessories({ items }) {
+  if (!items?.length) return null;
+
+  return (
+    <div className="mt-5 border-t border-line-soft pt-4">
+      <p className="label">Parts that suit it</p>
+
+      <ul className="mt-3 space-y-1.5">
+        {items.map((item) => (
+          <li key={`${item.category}-${item.value}`} className="flex justify-between gap-3">
+            <span className="readout text-[11px] text-chalk capitalize">
+              {item.category.replace(/([A-Z])/g, " $1").toLowerCase()}
+              {": "}
+              <span className="text-signal">{String(item.value)}</span>
+            </span>
+            <span className="text-[11px] text-fog">{item.why}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function ResultCard({ car, index }) {
-  const specs = [
-    ["Power", `${car.horsepower} hp`],
-    ["City", `${car.city_mpg} mpg`],
-    ["Highway", `${car.highway_mpg} mpg`]
-  ];
+  const verdict = VERDICTS[car.valuation.verdict];
+  const garage = matchGarageCar(car);
 
   return (
     <motion.article
@@ -22,73 +53,113 @@ function ResultCard({ car, index }) {
     >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <span className="label">Match {String(index + 1).padStart(2, "0")}</span>
-          <h3 className="mt-2 text-xl font-medium tracking-tight">
-            {car.make} {car.model}
-          </h3>
+          <span className="label">
+            {String(index + 1).padStart(2, "0")} · {car.body} · {car.segment}
+          </span>
+          <h3 className="mt-2 text-xl font-medium tracking-tight">{car.model}</h3>
         </div>
 
         <div className="text-right">
-          <span className="label">MSRP (USD)</span>
-          <p className="readout mt-1 text-lg text-signal">{formatUsd(car.price)}</p>
+          <span className="label">Typical price</span>
+          <p className="readout mt-1 text-lg text-signal">{lakh(car.price)}</p>
+          <p className="readout mt-0.5 text-[10px] text-fog">
+            {lakh(car.priceRange[0])} – {lakh(car.priceRange[1])}
+          </p>
         </div>
       </div>
 
-      <div className="tick-rule-dense mt-5 opacity-60" />
+      {/* MATCH STRENGTH */}
+      <div className="mt-4 flex items-center gap-3">
+        <div className="h-[2px] flex-1 bg-line">
+          <div className="h-full bg-signal" style={{ width: `${car.match}%` }} />
+        </div>
+        <span className="readout text-[10px] text-fog">{car.match}% match</span>
+      </div>
 
-      <dl className="mt-4 grid grid-cols-3 gap-4">
-        {specs.map(([label, value]) => (
+      <dl className="mt-5 grid grid-cols-4 gap-3">
+        {[
+          ["Power", `${car.power} bhp`],
+          ["Engine", `${car.engine} cc`],
+          ["Economy", `${car.mileage} kmpl`],
+          ["Seats", car.seats]
+        ].map(([label, value]) => (
           <div key={label}>
             <dt className="label">{label}</dt>
             <dd className="readout mt-1 text-sm text-chalk">{value}</dd>
           </div>
         ))}
       </dl>
+
+      {/* WHY IT CAME BACK */}
+      <ul className="mt-5 flex flex-wrap gap-2">
+        {car.reasons.map((reason) => (
+          <li
+            key={reason}
+            className="readout border border-line px-2 py-1 text-[10px] text-fog"
+          >
+            {reason}
+          </li>
+        ))}
+      </ul>
+
+      <p className={`readout mt-4 text-[11px] ${verdict.tone}`}>
+        {verdict.label} — the model puts this spec around {lakh(car.valuation.fair)}
+      </p>
+
+      <Accessories items={car.accessories} />
+
+      <Link
+        to="/configure"
+        className="btn btn-ghost mt-5 w-full"
+        title={garage.exact ? undefined : "The nearest car we have a model of"}
+      >
+        Build the {garage.car.name}
+        <span className="ml-2 opacity-60">({garage.reason})</span>
+      </Link>
     </motion.article>
   );
 }
 
 export default function RecommendPage() {
-  const [results, setResults] = useState(null);
+  const [data, setData] = useState(null);
+
+  const results = data?.results ?? null;
 
   return (
     <div className="mx-auto max-w-[1500px] px-5 py-14 md:px-8">
 
-      {/* HEADER */}
       <header>
         <p className="label">02 / AI Match</p>
         <h1 className="mt-4 max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">
-          Describe the car you want.
+          Tell it how you drive.
         </h1>
         <p className="mt-5 max-w-xl text-sm leading-relaxed text-fog">
-          A scikit-learn model scores your figures, then returns the five cars
-          whose scores sit closest to it. Trained on a US market dataset, so
-          prices come back in dollars.
+          Content based filtering over 166 models from the Indian used market.
+          Anything that cannot work is filtered out first, then what remains is
+          ranked against what you asked for. Every result says why it is there.
         </p>
         <div className="tick-rule mt-8 opacity-70" />
       </header>
 
       <div className="mt-12 grid gap-10 lg:grid-cols-[380px_1fr]">
 
-        {/* FORM */}
         <div>
           <div className="panel p-6 lg:sticky lg:top-24">
-            <p className="label">Requirements</p>
+            <p className="label">About you</p>
             <div className="mt-5">
-              <MLPanel onResults={setResults} />
+              <MLPanel onResults={setData} />
             </div>
           </div>
         </div>
 
-        {/* RESULTS */}
         <div>
           {results === null && (
             <div className="grid-veil flex min-h-[320px] items-center justify-center border border-line-soft p-10 text-center">
               <div>
                 <p className="label">Awaiting input</p>
                 <p className="mt-4 max-w-sm text-sm leading-relaxed text-fog">
-                  Set your requirements and run the model. Results appear here,
-                  ranked by how closely each car matches.
+                  Set a budget and say how you drive. Matches appear here with
+                  the reasoning behind each one.
                 </p>
               </div>
             </div>
@@ -96,9 +167,10 @@ export default function RecommendPage() {
 
           {results !== null && results.length === 0 && (
             <div className="border border-line-soft p-10 text-center">
-              <p className="label">No results</p>
-              <p className="mt-4 text-sm text-fog">
-                The model returned nothing. Try adjusting your figures.
+              <p className="label">Nothing fits</p>
+              <p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-fog">
+                {data.message ??
+                  "Nothing in the data fits that. Try raising the budget or asking for fewer seats."}
               </p>
             </div>
           )}
@@ -106,15 +178,15 @@ export default function RecommendPage() {
           {results !== null && results.length > 0 && (
             <>
               <div className="flex items-center justify-between">
-                <p className="label">{results.length} matches</p>
-                <Link to="/configure" className="label hover:text-signal">
-                  Build one →
-                </Link>
+                <p className="label">
+                  {results.length} matches from {data.considered} that fit
+                </p>
+                <span className="label">Budget {lakh(data.budget)}</span>
               </div>
 
               <div className="mt-5 grid gap-4 xl:grid-cols-2">
                 {results.map((car, index) => (
-                  <ResultCard key={`${car.make}-${car.model}-${index}`} car={car} index={index} />
+                  <ResultCard key={`${car.brand}-${car.model}`} car={car} index={index} />
                 ))}
               </div>
             </>

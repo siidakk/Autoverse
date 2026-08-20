@@ -1,48 +1,43 @@
-import { useEffect, useRef, useState } from "react"
-import axios from "axios"
+import { useEffect, useRef, useState } from "react";
+import axios from "axios";
+import { apiBaseUrl } from "../lib/api";
 
-const apiBaseUrl = (import.meta.env.VITE_API_URL || "http://localhost:5000")
-  .replace(/\/$/, "")
+// What a buyer can actually say about themselves. The old form asked for
+// horsepower and highway mpg, which is the answer, not the question.
 
-const transmissions = [
-  "AUTOMATIC",
-  "MANUAL",
-  "AUTOMATED_MANUAL",
-  "DIRECT_DRIVE",
-  "UNKNOWN"
-]
+const BUDGETS = [
+  { value: 300000, label: "3L" },
+  { value: 500000, label: "5L" },
+  { value: 800000, label: "8L" },
+  { value: 1200000, label: "12L" },
+  { value: 2000000, label: "20L" },
+  { value: 4000000, label: "40L" }
+];
 
-const drivenWheels = [
-  "rear wheel drive",
-  "front wheel drive",
-  "all wheel drive",
-  "four wheel drive"
-]
+const FUELS = ["any", "Petrol", "Diesel", "CNG", "LPG"];
+const SEATS = [4, 5, 6, 7, 8];
+const BODIES = ["any", "Hatchback", "Sedan", "SUV", "MPV"];
 
-const vehicleSizes = ["Compact", "Midsize", "Large"]
+const DRIVING = [
+  { value: "calm", label: "Calm", note: "Economy over pace" },
+  { value: "balanced", label: "Balanced", note: "A bit of both" },
+  { value: "spirited", label: "Spirited", note: "Wants the power" }
+];
 
-const vehicleStyles = [
-  "Coupe",
-  "Convertible",
-  "Sedan",
-  "Wagon",
-  "4dr Hatchback",
-  "2dr Hatchback",
-  "4dr SUV",
-  "Passenger Minivan",
-  "Cargo Minivan",
-  "Crew Cab Pickup",
-  "Regular Cab Pickup",
-  "Extended Cab Pickup",
-  "2dr SUV",
-  "Cargo Van",
-  "Convertible SUV",
-  "Passenger Van"
-]
+const USAGE = [
+  { value: "city", label: "City", note: "Traffic, short runs" },
+  { value: "mixed", label: "Mixed", note: "A bit of everything" },
+  { value: "highway", label: "Highway", note: "Long distances" }
+];
 
-// The API sleeps on Render's free tier, so a first request can take a while.
-// Warn rather than let it look broken.
-const SLOW_REQUEST_MS = 4000
+const PRIORITY = [
+  { value: "value", label: "Value", note: "Cheapest to run" },
+  { value: "balanced", label: "Balanced", note: "No strong lean" },
+  { value: "comfort", label: "Space", note: "Room for people" },
+  { value: "performance", label: "Performance", note: "Power first" }
+];
+
+const SLOW_REQUEST_MS = 4000;
 
 function Field({ label, children }) {
   return (
@@ -50,157 +45,150 @@ function Field({ label, children }) {
       <span className="label">{label}</span>
       <div className="mt-2">{children}</div>
     </label>
-  )
+  );
 }
 
-function Select({ value, onChange, options }) {
+function Segmented({ options, value, onChange, columns = 3 }) {
   return (
-    <select
-      className="field"
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
+    <div
+      className="grid gap-px bg-line-soft"
+      style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
     >
-      {options.map((option) => (
-        <option key={option} value={option}>
-          {option}
-        </option>
-      ))}
-    </select>
-  )
+      {options.map((option) => {
+        const key = option.value ?? option;
+        const text = option.label ?? String(option);
+        const active = value === key;
+
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onChange(key)}
+            title={option.note}
+            className={[
+              "px-2 py-2.5 text-center transition-colors",
+              active ? "bg-signal text-ink" : "bg-ink text-fog hover:text-chalk"
+            ].join(" ")}
+          >
+            <span className="block text-[11px] font-medium capitalize">{text}</span>
+            {option.note && (
+              <span className="mt-0.5 block text-[9px] opacity-80">{option.note}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
-function MLPanel({ onResults }) {
+export default function MLPanel({ onResults }) {
 
-  const [horsepower, setHorsepower] = useState(400)
-  const [cityMPG, setCityMPG] = useState(18)
-  const [highwayMPG, setHighwayMPG] = useState(28)
-  const [transmission, setTransmission] = useState("AUTOMATIC")
-  const [wheels, setWheels] = useState("rear wheel drive")
-  const [vehicleSize, setVehicleSize] = useState("Midsize")
-  const [vehicleStyle, setVehicleStyle] = useState("Coupe")
+  const [budget, setBudget] = useState(800000);
+  const [fuel, setFuel] = useState("any");
+  const [seats, setSeats] = useState(5);
+  const [body, setBody] = useState("any");
+  const [transmission, setTransmission] = useState("any");
+  const [driving, setDriving] = useState("balanced");
+  const [usage, setUsage] = useState("mixed");
+  const [priority, setPriority] = useState("balanced");
 
-  const [loading, setLoading] = useState(false)
-  const [slow, setSlow] = useState(false)
-  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(false);
+  const [slow, setSlow] = useState(false);
+  const [error, setError] = useState(null);
 
-  const slowTimer = useRef(null)
+  const slowTimer = useRef(null);
+  useEffect(() => () => window.clearTimeout(slowTimer.current), []);
 
-  useEffect(() => () => window.clearTimeout(slowTimer.current), [])
+  const run = async () => {
+    setLoading(true);
+    setSlow(false);
+    setError(null);
 
-  const getRecommendations = async () => {
-
-    setLoading(true)
-    setSlow(false)
-    setError(null)
-
-    slowTimer.current = window.setTimeout(() => setSlow(true), SLOW_REQUEST_MS)
+    slowTimer.current = window.setTimeout(() => setSlow(true), SLOW_REQUEST_MS);
 
     try {
-
       const response = await axios.post(
         `${apiBaseUrl}/ml`,
-        {
-          horsepower,
-          city_mpg: cityMPG,
-          highway_mpg: highwayMPG,
-          transmission,
-          driven_wheels: wheels,
-          vehicle_size: vehicleSize,
-          vehicle_style: vehicleStyle
-        },
+        { budget, fuel, seats, body, transmission, driving, usage, priority },
         { timeout: 90000 }
-      )
+      );
 
-      onResults(response.data)
-
-    }
-
-    catch (requestError) {
-
-      const status = requestError.response?.status
+      onResults({ ...response.data, budget });
+    } catch (requestError) {
+      const status = requestError.response?.status;
 
       setError(
         status === 502
-          ? "The recommendation service is not responding. It may still be waking up — try again in a moment."
+          ? "The recommendation service is not responding. It may still be waking up."
           : requestError.code === "ECONNABORTED"
-            ? "The request timed out. The API sleeps when idle, so a retry usually works."
-            : "Could not reach the API. Check that the backend is running."
-      )
+            ? "That took too long. The API sleeps when idle, so try again."
+            : "Could not reach the API. Check the backend is running."
+      );
 
-      // Cleared rather than emptied, so the results pane does not claim the
-      // model returned nothing when it never ran.
-      onResults(null)
-
+      onResults(null);
+    } finally {
+      window.clearTimeout(slowTimer.current);
+      setLoading(false);
+      setSlow(false);
     }
-
-    finally {
-      window.clearTimeout(slowTimer.current)
-      setLoading(false)
-      setSlow(false)
-    }
-
-  }
+  };
 
   return (
     <div>
-
       <div className="space-y-5">
 
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="Power (hp)">
-            <input
-              type="number"
-              className="field"
-              value={horsepower}
-              onChange={(event) => setHorsepower(Number(event.target.value))}
-            />
-          </Field>
-
-          <Field label="City mpg">
-            <input
-              type="number"
-              className="field"
-              value={cityMPG}
-              onChange={(event) => setCityMPG(Number(event.target.value))}
-            />
-          </Field>
-
-          <Field label="Hwy mpg">
-            <input
-              type="number"
-              className="field"
-              value={highwayMPG}
-              onChange={(event) => setHighwayMPG(Number(event.target.value))}
-            />
-          </Field>
-        </div>
-
-        <Field label="Transmission">
-          <Select value={transmission} onChange={setTransmission} options={transmissions} />
+        <Field label={`Budget — ₹${(budget / 100000).toFixed(0)} lakh`}>
+          <Segmented
+            options={BUDGETS}
+            value={budget}
+            onChange={setBudget}
+            columns={6}
+          />
         </Field>
 
-        <Field label="Driven wheels">
-          <Select value={wheels} onChange={setWheels} options={drivenWheels} />
+        <Field label="Fuel">
+          <Segmented options={FUELS} value={fuel} onChange={setFuel} columns={5} />
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Size">
-            <Select value={vehicleSize} onChange={setVehicleSize} options={vehicleSizes} />
+          <Field label="Seats needed">
+            <Segmented options={SEATS} value={seats} onChange={setSeats} columns={5} />
           </Field>
 
-          <Field label="Body style">
-            <Select value={vehicleStyle} onChange={setVehicleStyle} options={vehicleStyles} />
+          <Field label="Gearbox">
+            <Segmented
+              options={["any", "Manual", "Automatic"]}
+              value={transmission}
+              onChange={setTransmission}
+              columns={3}
+            />
           </Field>
         </div>
+
+        <Field label="Body">
+          <Segmented options={BODIES} value={body} onChange={setBody} columns={5} />
+        </Field>
+
+        <Field label="How you drive">
+          <Segmented options={DRIVING} value={driving} onChange={setDriving} />
+        </Field>
+
+        <Field label="Where you drive">
+          <Segmented options={USAGE} value={usage} onChange={setUsage} />
+        </Field>
+
+        <Field label="What matters most">
+          <Segmented options={PRIORITY} value={priority} onChange={setPriority} columns={4} />
+        </Field>
       </div>
 
       <button
         type="button"
-        onClick={getRecommendations}
+        onClick={run}
         disabled={loading}
         className="btn btn-signal mt-7 w-full disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {loading ? "Running model…" : "Run recommendation"}
+        {loading ? "Matching…" : "Find my car"}
       </button>
 
       {loading && (
@@ -208,8 +196,8 @@ function MLPanel({ onResults }) {
           <div className="sweep relative h-[2px] w-full overflow-hidden bg-line" />
           {slow && (
             <p className="mt-3 text-xs leading-relaxed text-fog">
-              Still waiting. The API is hosted on a free tier and sleeps when
-              idle, so the first request after a pause can take up to a minute.
+              Still waiting. The API is on a free tier and sleeps when idle, so
+              the first request after a pause can take up to a minute.
             </p>
           )}
         </div>
@@ -221,10 +209,6 @@ function MLPanel({ onResults }) {
           <p className="mt-2 text-xs leading-relaxed text-fog">{error}</p>
         </div>
       )}
-
     </div>
-  )
-
+  );
 }
-
-export default MLPanel
