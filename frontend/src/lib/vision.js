@@ -12,14 +12,22 @@
 let detector = null;
 let loading = null;
 
+// Weights are fetched from Google's model host on first use and run to several
+// megabytes across five files. On a slow line that is a minute or more of a
+// page looking like it has hung, so the wait is started as early as possible
+// and reported while it happens.
+export const MODEL_SIZE_MB = 6;
+
+export const detectorState = () => (detector ? "ready" : loading ? "loading" : "idle");
+
 // Kept out of the main bundle. Nobody visiting the configurator should download
 // a detection model they never asked for.
-async function loadDetector(onProgress) {
-  if (detector) return detector;
+export function warmDetector(onProgress) {
+  if (detector) return Promise.resolve(detector);
 
   if (!loading) {
     loading = (async () => {
-      onProgress?.("Loading the detector");
+      onProgress?.("Starting up");
 
       const [tf, , cocoSsd] = await Promise.all([
         import("@tensorflow/tfjs-core"),
@@ -30,14 +38,26 @@ async function loadDetector(onProgress) {
       await tf.setBackend("webgl");
       await tf.ready();
 
-      onProgress?.("Fetching weights");
-      detector = await cocoSsd.load({ base: "lite_mobilenet_v2" });
+      onProgress?.("Downloading the model");
+
+      try {
+        detector = await cocoSsd.load({ base: "lite_mobilenet_v2" });
+      } catch (error) {
+        // Let the next attempt start over rather than waiting on a promise
+        // that already failed.
+        loading = null;
+        throw error;
+      }
 
       return detector;
     })();
   }
 
   return loading;
+}
+
+async function loadDetector(onProgress) {
+  return warmDetector(onProgress);
 }
 
 const VEHICLES = ["car", "truck", "bus"];

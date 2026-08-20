@@ -1,7 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { inspectPhoto } from "../lib/vision";
+import { inspectPhoto, warmDetector, detectorState, MODEL_SIZE_MB } from "../lib/vision";
 import { cars } from "../data/cars";
 
 // Photo of a car, in. The closest thing we can actually show you, out, painted
@@ -35,8 +35,40 @@ export default function DetectPage() {
   const [error, setError] = useState(null);
   const [dragging, setDragging] = useState(false);
 
+  // Starts as loading because the effect below always begins the download,
+  // and a model already fetched this session is ready immediately.
+  const [model, setModel] = useState(() =>
+    detectorState() === "ready" ? "ready" : "loading"
+  );
+  const [waited, setWaited] = useState(0);
+
   const imageRef = useRef(null);
   const inputRef = useRef(null);
+
+  // The download is started on arrival rather than on the first click, so the
+  // wait happens while a photo is being chosen instead of afterwards.
+  useEffect(() => {
+    let cancelled = false;
+
+    const started = Date.now();
+    const ticker = window.setInterval(() => {
+      if (!cancelled) setWaited(Math.round((Date.now() - started) / 1000));
+    }, 500);
+
+    warmDetector()
+      .then(() => {
+        if (!cancelled) setModel("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setModel("failed");
+      })
+      .finally(() => window.clearInterval(ticker));
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(ticker);
+    };
+  }, []);
 
   const handleFile = (file) => {
     if (!file || !file.type.startsWith("image/")) {
@@ -168,14 +200,44 @@ export default function DetectPage() {
             onChange={(event) => handleFile(event.target.files?.[0])}
           />
 
+          {/* THE DOWNLOAD, WHICH IS THE SLOW PART AND SHOULD SAY SO */}
+          {model === "loading" && (
+            <div className="mt-4 border border-line-soft bg-panel px-4 py-3">
+              <div className="flex items-center justify-between">
+                <p className="label">Downloading the detector</p>
+                <span className="readout text-[10px] text-fog">{waited}s</span>
+              </div>
+              <div className="sweep relative mt-3 h-[2px] w-full overflow-hidden bg-line" />
+              <p className="mt-3 text-xs leading-relaxed text-fog">
+                About {MODEL_SIZE_MB} MB, once. It is fetched from Google's model
+                host, so on a slow line this can take a minute. You can pick a
+                photo while it finishes.
+              </p>
+            </div>
+          )}
+
+          {model === "failed" && (
+            <div className="mt-4 border border-signal-deep bg-signal-deep/10 px-4 py-3">
+              <p className="label text-signal">The detector did not load</p>
+              <p className="mt-2 text-xs leading-relaxed text-fog">
+                The model is downloaded from Google's host and that request did
+                not complete. Reload the page to try again.
+              </p>
+            </div>
+          )}
+
           {preview && (
             <button
               type="button"
               onClick={run}
-              disabled={Boolean(status)}
+              disabled={Boolean(status) || model === "loading"}
               className="btn btn-signal mt-4 w-full disabled:opacity-60"
             >
-              {status ? `${status}…` : "Find the car"}
+              {status
+                ? `${status}…`
+                : model === "loading"
+                  ? "Waiting for the detector"
+                  : "Find the car"}
             </button>
           )}
 
