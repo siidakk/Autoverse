@@ -38,6 +38,36 @@ export async function recommend(preferences) {
   }
 }
 
+// Valuation takes the same route as recommendations: API first, recommender
+// directly if the API cannot be reached.
+export async function valuationOptions() {
+  try {
+    const { data } = await client.get("/valuation/options");
+    return data;
+  } catch (proxyError) {
+    if (proxyError.response && proxyError.response.status < 500) throw proxyError;
+
+    const { data } = await axios.get(`${mlBaseUrl}/valuation/options`, {
+      timeout: 90000
+    });
+    return data;
+  }
+}
+
+export async function valueCar(details) {
+  try {
+    const { data } = await client.post("/valuation", details);
+    return data;
+  } catch (proxyError) {
+    if (proxyError.response && proxyError.response.status < 500) throw proxyError;
+
+    const { data } = await axios.post(`${mlBaseUrl}/valuation`, details, {
+      timeout: 90000
+    });
+    return data;
+  }
+}
+
 export async function saveBuild(payload) {
   const { data } = await client.post("/builds", payload);
   return data;

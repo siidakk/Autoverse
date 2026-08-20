@@ -22,6 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent
 
 bundle = joblib.load(BASE_DIR / "recommender.pkl")
 price_model = joblib.load(BASE_DIR / "price_model.pkl")
+valuation = joblib.load(BASE_DIR / "valuation.pkl")
 
 catalogue = bundle["catalogue"]
 scaler = bundle["scaler"]
@@ -305,6 +306,99 @@ def recommend():
         })
 
     return jsonify({"results": results, "considered": int(len(rows))})
+
+
+# ---------------------------------------------------------------- valuation
+
+def valuation_frame(data, age=None, km=None):
+    """One row in the shape the valuation model was trained on."""
+    return pd.DataFrame([{
+        "age": age if age is not None else float(data["age"]),
+        "km_driven": km if km is not None else float(data["km"]),
+        "max_power": float(data["power"]),
+        "engine": float(data["engine"]),
+        "mileage_kmpl": float(data["mileage"]),
+        "seats": float(data["seats"]),
+        "brand": data["brand"],
+        "fuel": data["fuel"],
+        "transmission": data["transmission"],
+        "owner": data["owner"],
+        "seller_type": data.get("seller", "Individual"),
+    }])
+
+
+@app.route("/valuation/options", methods=["GET"])
+def valuation_options():
+    """Everything the form needs, including the specs of each known model so a
+    seller does not have to know their own engine capacity."""
+    known = catalogue.sort_values(["brand", "model"])
+
+    return jsonify({
+        "models": [
+            {
+                "brand": row["brand"],
+                "model": row["model"],
+                "power": round(float(row["power"]), 1),
+                "engine": int(row["engine_cc"]),
+                "mileage": round(float(row["mileage"]), 1),
+                "seats": int(row["seats"]),
+                "fuels": list(row["fuels"]),
+                "transmissions": list(row["transmissions"]),
+                "typical": rupees(row["price"]),
+            }
+            for _, row in known.iterrows()
+        ],
+        "owners": valuation["owners"],
+        "sellers": ["Individual", "Dealer", "Trustmark Dealer"],
+        "years": [1995, LATEST_YEAR],
+        "accuracy": {
+            "chosen": valuation["chosen"],
+            "r2": round(valuation["metrics"][valuation["chosen"]]["r2"], 3),
+            "typicalError": round(valuation["metrics"][valuation["chosen"]]["mape"], 1),
+            "within20": round(valuation["metrics"][valuation["chosen"]]["within20"], 1),
+            "coverage": round(valuation["coverage"], 1),
+            "compared": {
+                name: round(scores["r2"], 3)
+                for name, scores in valuation["metrics"].items()
+            },
+        },
+    })
+
+
+@app.route("/valuation", methods=["POST"])
+def value_car():
+    data = request.json or {}
+
+    try:
+        frame = valuation_frame(data)
+    except (KeyError, TypeError, ValueError):
+        return jsonify({"error": "Missing or invalid car details."}), 400
+
+    estimate = float(np.expm1(valuation["model"].predict(frame)[0]))
+    low = float(np.expm1(valuation["low"].predict(frame)[0]))
+    high = float(np.expm1(valuation["high"].predict(frame)[0]))
+
+    # The quantile models are fitted separately and can cross on unusual cars.
+    low, high = min(low, high), max(low, high)
+
+    # What the same car is worth as it ages, which is the shape of the answer
+    # rather than a single number.
+    age_now = int(float(data["age"]))
+    curve = []
+    for age in range(0, 16):
+        predicted = float(np.expm1(
+            valuation["model"].predict(
+                valuation_frame(data, age=age, km=max(age, 0) * 12000)
+            )[0]
+        ))
+        curve.append({"age": age, "value": rupees(predicted), "now": age == age_now})
+
+    return jsonify({
+        "estimate": rupees(estimate),
+        "range": [rupees(low), rupees(high)],
+        "curve": curve,
+        "model": valuation["chosen"],
+    })
 
 
 if __name__ == "__main__":

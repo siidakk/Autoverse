@@ -4,6 +4,7 @@ import SiteLayout from "./components/layout/SiteLayout";
 import HomePage from "./pages/HomePage";
 import ShowroomPage from "./pages/ShowroomPage";
 import RecommendPage from "./pages/RecommendPage";
+import ValuationPage from "./pages/ValuationPage";
 
 function App() {
   return (
@@ -16,6 +17,8 @@ function App() {
           <Route path="/configure" element={<ShowroomPage />} />
 
           <Route path="/recommend" element={<RecommendPage />} />
+
+          <Route path="/value" element={<ValuationPage />} />
 
           {/* The configurator used to live at the root */}
           <Route path="/showroom" element={<Navigate to="/configure" replace />} />

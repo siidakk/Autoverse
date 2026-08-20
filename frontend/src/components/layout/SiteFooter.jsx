@@ -37,6 +37,7 @@ export default function SiteFooter() {
             <Link to="/" className="w-fit hover:text-signal">Home</Link>
             <Link to="/configure" className="w-fit hover:text-signal">Configurator</Link>
             <Link to="/recommend" className="w-fit hover:text-signal">AI Match</Link>
+            <Link to="/value" className="w-fit hover:text-signal">Valuation</Link>
           </div>
         </div>
 
