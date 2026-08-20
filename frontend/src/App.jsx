@@ -6,6 +6,7 @@ import ShowroomPage from "./pages/ShowroomPage";
 import RecommendPage from "./pages/RecommendPage";
 import ValuationPage from "./pages/ValuationPage";
 import DetectPage from "./pages/DetectPage";
+import DamagePage from "./pages/DamagePage";
 
 function App() {
   return (
@@ -22,6 +23,8 @@ function App() {
           <Route path="/value" element={<ValuationPage />} />
 
           <Route path="/detect" element={<DetectPage />} />
+
+          <Route path="/damage" element={<DamagePage />} />
 
           {/* The configurator used to live at the root */}
           <Route path="/showroom" element={<Navigate to="/configure" replace />} />
