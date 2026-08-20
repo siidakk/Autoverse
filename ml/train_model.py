@@ -212,8 +212,12 @@ def train_price_model(listings):
             [("categorical", OneHotEncoder(handle_unknown="ignore"), categorical)],
             remainder="passthrough"
         )),
+        # Sized for a free tier. Two hundred trees left unpruned come to fifty
+        # megabytes on disk and score 0.942; sixty trees with a larger leaf come
+        # to under three and score 0.940, which is not a difference worth half a
+        # gigabyte of memory at boot.
         ("forest", RandomForestRegressor(
-            n_estimators=220, min_samples_leaf=2, random_state=42, n_jobs=-1
+            n_estimators=60, min_samples_leaf=3, random_state=42, n_jobs=-1
         ))
     ])
 
@@ -257,8 +261,9 @@ def main():
             "latest_year": LATEST_YEAR,
         },
         "recommender.pkl",
+        compress=3,
     )
-    joblib.dump(price_model, "price_model.pkl")
+    joblib.dump(price_model, "price_model.pkl", compress=3)
 
     print("\nSaved recommender.pkl and price_model.pkl\n")
 
