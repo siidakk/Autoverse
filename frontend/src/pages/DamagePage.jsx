@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { inspectPhoto } from "../lib/vision";
+import { inspectPhoto, readPaint } from "../lib/vision";
 import {
   findCandidates,
   repairCost,
@@ -87,7 +87,14 @@ export default function DamagePage() {
         : [0, 0, imageRef.current.naturalWidth, imageRef.current.naturalHeight];
 
       setStatus("Looking over the panels");
-      const candidates = findCandidates(imageRef.current, box);
+
+      // The paint colour is what separates a crumpled wing from a grille. Both
+      // are busy; only one of them is the colour of the car.
+      const paint = found.found
+        ? found.paint.hex
+        : readPaint(imageRef.current, box).hex;
+
+      const candidates = findCandidates(imageRef.current, box, { paint });
 
       setScan({
         candidates,
@@ -183,8 +190,8 @@ export default function DamagePage() {
                       height: `${(candidate.box[3] / scan.imageSize.height) * 100}%`
                     }}
                   >
-                    <span className="readout absolute -top-5 left-0 bg-signal px-1.5 text-[9px] text-ink">
-                      {strength(candidate.score)}
+                    <span className="readout absolute -top-4 left-0 bg-signal px-1 text-[9px] leading-4 whitespace-nowrap text-ink">
+                      {index + 1}. {strength(candidate.score)}
                     </span>
                   </div>
                 ))}

@@ -14,17 +14,59 @@
 
 // ---------------------------------------------------------------- candidates
 
-function toGrey(context, width, height) {
+function readPixels(context, width, height) {
   const { data } = context.getImageData(0, 0, width, height);
   const grey = new Float32Array(width * height);
-  const light = new Float32Array(width * height);
 
   for (let i = 0, p = 0; i < data.length; i += 4, p++) {
     grey[p] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    light[p] = grey[p];
   }
 
-  return { grey, light };
+  return { grey, rgb: data };
+}
+
+function hexToRgb(hex) {
+  return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+}
+
+// Merges flagged cells that touch into one region, so a long crease reads as a
+// single area rather than as four separate findings sitting next to each other.
+function mergeRegions(flagged) {
+  const key = (row, column) => `${row},${column}`;
+  const pool = new Map(flagged.map((cell) => [key(cell.row, cell.column), cell]));
+  const regions = [];
+
+  while (pool.size) {
+    const [firstKey] = pool.keys();
+    const stack = [pool.get(firstKey)];
+    pool.delete(firstKey);
+
+    const group = [];
+
+    while (stack.length) {
+      const cell = stack.pop();
+      group.push(cell);
+
+      for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+        const neighbour = pool.get(key(cell.row + dr, cell.column + dc));
+        if (neighbour) {
+          pool.delete(key(neighbour.row, neighbour.column));
+          stack.push(neighbour);
+        }
+      }
+    }
+
+    regions.push({
+      cells: group,
+      score: Math.max(...group.map((cell) => cell.score)),
+      minRow: Math.min(...group.map((cell) => cell.row)),
+      maxRow: Math.max(...group.map((cell) => cell.row)),
+      minColumn: Math.min(...group.map((cell) => cell.column)),
+      maxColumn: Math.max(...group.map((cell) => cell.column))
+    });
+  }
+
+  return regions;
 }
 
 /**
@@ -34,7 +76,7 @@ function toGrey(context, width, height) {
  * a score of how far it departs from the panel around it.
  */
 export function findCandidates(image, box, options = {}) {
-  const { cells = 16, keep = 4 } = options;
+  const { cells = 16, keep = 3, paint = null } = options;
 
   const [boxLeft, boxTop, boxWidth, boxHeight] = box;
 
@@ -53,7 +95,8 @@ export function findCandidates(image, box, options = {}) {
   const context = canvas.getContext("2d", { willReadFrequently: true });
   context.drawImage(image, boxLeft, boxTop, boxWidth, boxHeight, 0, 0, width, height);
 
-  const { grey, light } = toGrey(context, width, height);
+  const { grey, rgb } = readPixels(context, width, height);
+  const paintRgb = paint ? hexToRgb(paint) : null;
 
   // Sobel, which is the standard way of asking how fast the picture is changing.
   const gradient = new Float32Array(width * height);
@@ -83,56 +126,90 @@ export function findCandidates(image, box, options = {}) {
 
   for (let row = 0; row < rows; row++) {
     for (let column = 0; column < cells; column++) {
-      let total = 0;
+      const values = [];
       let brightness = 0;
+      let painted = 0;
       let count = 0;
 
       for (let y = row * cellH; y < (row + 1) * cellH && y < height; y++) {
         for (let x = column * cellW; x < (column + 1) * cellW && x < width; x++) {
-          total += gradient[y * width + x];
-          brightness += light[y * width + x];
+          const p = y * width + x;
+
+          values.push(gradient[p]);
+          brightness += grey[p];
           count++;
+
+          // Counted pixel by pixel rather than averaged. A cell holding mostly
+          // white bonnet and one black grille slat averages out to something
+          // close to white, sails through, and brings the slat's enormous
+          // gradient with it. That is how the grille kept winning.
+          if (paintRgb) {
+            const distance = Math.hypot(
+              rgb[p * 4] - paintRgb[0],
+              rgb[p * 4 + 1] - paintRgb[1],
+              rgb[p * 4 + 2] - paintRgb[2]
+            );
+            if (distance < 82) painted++;
+          }
         }
       }
 
       if (!count) continue;
 
+      // The median across the cell, not the mean. A panel gap or the edge of a
+      // grille is a handful of pixels with an enormous gradient, and a mean
+      // hands them the cell. Damage is not one hard line, it is roughness
+      // spread across the paint, which is what a median is high for.
+      values.sort((a, b) => a - b);
+
       scored.push({
         row,
         column,
-        gradient: total / count,
-        brightness: brightness / count
+        gradient: values[Math.floor(values.length / 2)],
+        brightness: brightness / count,
+        paintedShare: paintRgb ? painted / count : 1
       });
     }
   }
 
   if (!scored.length) return [];
 
-  // Glass, tyres and deep shadow are busy for reasons that are not damage, so
-  // the darkest cells are set aside rather than reported.
-  const usable = scored.filter((cell) => cell.brightness > 45);
-  if (usable.length < 4) return [];
+  // Only painted bodywork is judged. This is the whole point: a grille is the
+  // busiest thing on the front of a car and it is meant to be. Looking for a
+  // rough patch anywhere finds the grille, the badge and the lamps every time.
+  // Looking for a rough patch *in the paint* finds the dent.
+  // Nearly the whole cell has to be paint. Anything straddling a panel gap, a
+  // lamp or the grille is thrown out along with the edge it was carrying.
+  const usable = scored.filter(
+    (cell) => cell.brightness > 45 && cell.paintedShare > 0.88
+  );
 
-  // The panel's own texture is whatever most of the car is doing. Damage is
+  if (usable.length < 6) return [];
+
+  // The panel's own texture is whatever most of the paint is doing. Damage is
   // what stands out from that, not what is merely detailed.
   const sorted = [...usable].sort((a, b) => a.gradient - b.gradient);
   const median = sorted[Math.floor(sorted.length / 2)].gradient;
-  const spread =
-    sorted[Math.floor(sorted.length * 0.9)].gradient - median || 1;
+  const spread = sorted[Math.floor(sorted.length * 0.9)].gradient - median || 1;
 
-  return usable
+  const flagged = usable
     .map((cell) => ({ ...cell, score: (cell.gradient - median) / spread }))
-    .filter((cell) => cell.score > 1.6)
+    .filter((cell) => cell.score > 1.4);
+
+  if (!flagged.length) return [];
+
+  return mergeRegions(flagged)
     .sort((a, b) => b.score - a.score)
     .slice(0, keep)
-    .map((cell) => ({
-      score: Number(cell.score.toFixed(2)),
+    .map((region) => ({
+      score: Number(region.score.toFixed(2)),
+      cells: region.cells.length,
       // Back into the original photograph's coordinates.
       box: [
-        boxLeft + (cell.column * cellW / width) * boxWidth,
-        boxTop + (cell.row * cellH / height) * boxHeight,
-        (cellW / width) * boxWidth,
-        (cellH / height) * boxHeight
+        boxLeft + (region.minColumn * cellW / width) * boxWidth,
+        boxTop + (region.minRow * cellH / height) * boxHeight,
+        ((region.maxColumn - region.minColumn + 1) * cellW / width) * boxWidth,
+        ((region.maxRow - region.minRow + 1) * cellH / height) * boxHeight
       ]
     }));
 }
