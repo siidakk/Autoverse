@@ -77,8 +77,17 @@ function CarList({ selected, onSelect }) {
 
 export default function Showroom() {
 
-  const [selectedCar, setSelectedCar] = useState(cars[0]);
-  const [color, setColor] = useState("#d8dce1");
+  // Arriving from a photo carries a car and its paint in the link. Read once,
+  // as the starting point only, so everything after this is the user's doing.
+  const [selectedCar, setSelectedCar] = useState(() => {
+    const requested = Number(new URLSearchParams(window.location.search).get("car"));
+    return cars.find((entry) => entry.id === requested) ?? cars[0];
+  });
+
+  const [color, setColor] = useState(() => {
+    const paint = new URLSearchParams(window.location.search).get("colour");
+    return /^#[0-9a-f]{6}$/i.test(paint ?? "") ? paint : "#d8dce1";
+  });
   const [finish, setFinish] = useState("glossy");
   const [wheelType, setWheelType] = useState("sport");
   const [spoilerType, setSpoilerType] = useState("stock");
@@ -121,6 +130,7 @@ export default function Showroom() {
   // flag starts on when there is a code, so the effect never has to set it.
   const sharedCode = searchParams.get("build");
   const [restoring, setRestoring] = useState(Boolean(sharedCode));
+
 
   const [paint, setPaint] = useState({
     metalness: finishes.glossy.metalness,

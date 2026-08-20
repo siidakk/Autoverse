@@ -5,7 +5,8 @@ const links = [
   { to: "/", label: "Home", index: "00" },
   { to: "/configure", label: "Configurator", index: "01" },
   { to: "/recommend", label: "AI Match", index: "02" },
-  { to: "/value", label: "Valuation", index: "03" }
+  { to: "/value", label: "Valuation", index: "03" },
+  { to: "/detect", label: "From a photo", index: "04" }
 ];
 
 export default function NavBar() {
