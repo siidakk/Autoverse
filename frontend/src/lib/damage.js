@@ -29,6 +29,32 @@ function hexToRgb(hex) {
   return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 }
 
+// Colour without brightness. A white door runs from 250 in the sun to 150 in
+// its own shadow, so matching paint by how close the numbers are throws away
+// most of the panel. What stays constant under shading is the ratio between
+// the channels, which is what this returns.
+function chromaticity(r, g, b) {
+  const sum = r + g + b + 1;
+  return [r / sum, g / sum];
+}
+
+function isPaint(r, g, b, paint) {
+  const [pr, pg] = paint.chroma;
+  const [cr, cg] = chromaticity(r, g, b);
+
+  // Grey paint and a black grille share a chromaticity, so brightness still has
+  // to be compared. Generously, because shadow is not a different colour.
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+  const ratio = luminance / paint.luminance;
+
+  return (
+    Math.abs(cr - pr) < 0.055 &&
+    Math.abs(cg - pg) < 0.055 &&
+    ratio > 0.42 &&
+    ratio < 1.75
+  );
+}
+
 // Merges flagged cells that touch into one region, so a long crease reads as a
 // single area rather than as four separate findings sitting next to each other.
 function mergeRegions(flagged) {
@@ -96,7 +122,15 @@ export function findCandidates(image, box, options = {}) {
   context.drawImage(image, boxLeft, boxTop, boxWidth, boxHeight, 0, 0, width, height);
 
   const { grey, rgb } = readPixels(context, width, height);
+
   const paintRgb = paint ? hexToRgb(paint) : null;
+  const paintModel = paintRgb
+    ? {
+        chroma: chromaticity(...paintRgb),
+        luminance:
+          0.299 * paintRgb[0] + 0.587 * paintRgb[1] + 0.114 * paintRgb[2]
+      }
+    : null;
 
   // Sobel, which is the standard way of asking how fast the picture is changing.
   const gradient = new Float32Array(width * height);
@@ -129,6 +163,7 @@ export function findCandidates(image, box, options = {}) {
       const values = [];
       let brightness = 0;
       let painted = 0;
+      let holes = 0;
       let count = 0;
 
       for (let y = row * cellH; y < (row + 1) * cellH && y < height; y++) {
@@ -143,31 +178,35 @@ export function findCandidates(image, box, options = {}) {
           // white bonnet and one black grille slat averages out to something
           // close to white, sails through, and brings the slat's enormous
           // gradient with it. That is how the grille kept winning.
-          if (paintRgb) {
-            const distance = Math.hypot(
-              rgb[p * 4] - paintRgb[0],
-              rgb[p * 4 + 1] - paintRgb[1],
-              rgb[p * 4 + 2] - paintRgb[2]
-            );
-            if (distance < 82) painted++;
+          if (paintModel) {
+            if (isPaint(rgb[p * 4], rgb[p * 4 + 1], rgb[p * 4 + 2], paintModel)) {
+              painted++;
+            }
+
+            // Grille slats are grey and read as paint, but what sits between
+            // them does not: a grille is full of near black gaps, and paint,
+            // however deep in shadow, is not.
+            if (grey[p] < paintModel.luminance * 0.38) holes++;
           }
         }
       }
 
       if (!count) continue;
 
-      // The median across the cell, not the mean. A panel gap or the edge of a
-      // grille is a handful of pixels with an enormous gradient, and a mean
-      // hands them the cell. Damage is not one hard line, it is roughness
-      // spread across the paint, which is what a median is high for.
+      // High in the cell, but not the very top. A mean lets one panel gap take
+      // the cell; a median misses real damage, because a crease is a few lines
+      // through paint that is otherwise smooth and most of the cell stays
+      // smooth. The eightieth percentile is high where a minority of the cell
+      // is rough and low where a single hard edge crosses it.
       values.sort((a, b) => a - b);
 
       scored.push({
         row,
         column,
-        gradient: values[Math.floor(values.length / 2)],
+        gradient: values[Math.floor(values.length * 0.8)],
         brightness: brightness / count,
-        paintedShare: paintRgb ? painted / count : 1
+        paintedShare: paintModel ? painted / count : 1,
+        holeShare: paintModel ? holes / count : 0
       });
     }
   }
@@ -181,7 +220,8 @@ export function findCandidates(image, box, options = {}) {
   // Nearly the whole cell has to be paint. Anything straddling a panel gap, a
   // lamp or the grille is thrown out along with the edge it was carrying.
   const usable = scored.filter(
-    (cell) => cell.brightness > 45 && cell.paintedShare > 0.88
+    (cell) =>
+      cell.brightness > 40 && cell.paintedShare > 0.75 && cell.holeShare < 0.1
   );
 
   if (usable.length < 6) return [];
@@ -198,7 +238,22 @@ export function findCandidates(image, box, options = {}) {
 
   if (!flagged.length) return [];
 
+  // A shutline, a body crease or the rubber strip along a door runs the whole
+  // length of the panel and is one cell wide. Damage is a place, not a line
+  // from one end to the other, so anything that long and that thin is the car
+  // as built rather than something that happened to it.
+  const seam = (region) => {
+    const tall = region.maxRow - region.minRow + 1;
+    const wide = region.maxColumn - region.minColumn + 1;
+
+    return (
+      (tall >= rows * 0.5 && wide <= 2) ||
+      (wide >= cells * 0.5 && tall <= 2)
+    );
+  };
+
   return mergeRegions(flagged)
+    .filter((region) => !seam(region))
     .sort((a, b) => b.score - a.score)
     .slice(0, keep)
     .map((region) => ({
