@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import axios from "axios";
-import { apiBaseUrl } from "../lib/api";
+
+import { recommend, apiBaseUrl } from "../lib/api";
 
 // What a buyer can actually say about themselves. The old form asked for
 // horsepower and highway mpg, which is the answer, not the question.
@@ -107,13 +107,11 @@ export default function MLPanel({ onResults }) {
     slowTimer.current = window.setTimeout(() => setSlow(true), SLOW_REQUEST_MS);
 
     try {
-      const response = await axios.post(
-        `${apiBaseUrl}/ml`,
-        { budget, fuel, seats, body, transmission, driving, usage, priority },
-        { timeout: 90000 }
-      );
+      const { data, direct } = await recommend({
+        budget, fuel, seats, body, transmission, driving, usage, priority
+      });
 
-      onResults({ ...response.data, budget });
+      onResults({ ...data, budget, direct });
     } catch (requestError) {
       const status = requestError.response?.status;
       const local = /localhost|127\.0\.0\.1/.test(apiBaseUrl);
