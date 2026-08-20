@@ -116,13 +116,21 @@ export default function MLPanel({ onResults }) {
       onResults({ ...response.data, budget });
     } catch (requestError) {
       const status = requestError.response?.status;
+      const local = /localhost|127\.0\.0\.1/.test(apiBaseUrl);
 
+      // A 502 means the API is up but cannot reach the recommender behind it.
+      // Hosted, that is a service waking up. Locally it is simply not running,
+      // and saying so with the command to fix it beats a guess.
       setError(
         status === 502
-          ? "The recommendation service is not responding. It may still be waking up."
+          ? local
+            ? "The recommendation service is not running. Start it with: cd ml && python app.py"
+            : "The recommendation service is waking up. Give it a moment and try again."
           : requestError.code === "ECONNABORTED"
-            ? "That took too long. The API sleeps when idle, so try again."
-            : "Could not reach the API. Check the backend is running."
+            ? "That took too long. The service sleeps when idle, so try again."
+            : local
+              ? "Could not reach the API. Start it with: cd backend && npm start"
+              : "Could not reach the API."
       );
 
       onResults(null);
