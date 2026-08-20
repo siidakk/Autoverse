@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "validate:models": "node tools/validate-model.mjs public/models",
+    "test:placement": "node tools/test-placement.mjs public/models",
     "compress:models": "node tools/compress-models.mjs public/models --replace"
   },
   "dependencies": {

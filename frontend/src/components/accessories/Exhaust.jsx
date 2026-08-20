@@ -1,3 +1,5 @@
+import { lowerBodyEnd } from "../../utils/placement";
+
 // Exhaust tips tuck under the rear valance. A real tip is about a tenth of a
 // metre across on a four and a half metre car, so everything here is kept to
 // that ratio rather than to whatever looks large enough on screen.
@@ -21,24 +23,11 @@ export default function Exhaust({ type, car, wheels }) {
   const layout = layouts[type];
   if (!layout) return null;
 
-  const { lengthAxis, widthAxis, midWidth, length, width, height, box, parts } = car;
+  const { lengthAxis, widthAxis, midWidth, length, width, height, box, rearSign } = car;
 
   // The back of the car measured low down, so a roof spoiler or a raised wing
   // cannot drag the tips out behind the bumper.
-  const lowParts = parts.filter(
-    (part) => part.center.y < box.min.y + height * 0.35
-  );
-
-  const rearSign = car.rearSign;
-  const rearEnd = lowParts.length
-    ? lowParts.reduce(
-        (furthest, part) =>
-          rearSign > 0
-            ? Math.max(furthest, part.box.max[lengthAxis])
-            : Math.min(furthest, part.box.min[lengthAxis]),
-        rearSign > 0 ? -Infinity : Infinity
-      )
-    : box[rearSign > 0 ? "max" : "min"][lengthAxis];
+  const rearEnd = lowerBodyEnd(car);
 
   const tipRadius = length * layout.radius;
   const tipLength = length * 0.04;
