@@ -8,7 +8,8 @@
     "db:show": "node tools/showData.mjs",
     "db:local": "node tools/localMongo.mjs",
     "test:auth": "node tools/testAuth.mjs",
-    "test:builds": "node tools/testBuilds.mjs"
+    "test:builds": "node tools/testBuilds.mjs",
+    "render:env": "node tools/renderEnv.mjs"
   },
   "keywords": [],
   "author": "",
