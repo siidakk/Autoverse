@@ -13,8 +13,20 @@ app.get("/", (req, res) => {
   res.send("AutoVerse Backend Running")
 })
 
+// Says what is actually working, not just that the process is alive. Opening
+// this in a browser answers "why can I not sign in" without reading any logs.
 app.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok" })
+  const states = ["disconnected", "connected", "connecting", "disconnecting"]
+  const database = states[mongoose.connection.readyState] ?? "unknown"
+
+  res.status(200).json({
+    status: "ok",
+    database,
+    accountsWork: database === "connected",
+    note: database === "connected"
+      ? "Accounts and saved builds are working."
+      : "The API is running but has no database, so accounts and saving are off. Start one with: cd backend && npm run db:local"
+  })
 })
 
 if (mongoUri) {
