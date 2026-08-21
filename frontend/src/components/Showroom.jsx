@@ -9,6 +9,7 @@ import {
   wheelOptions,
   spoilerOptions,
   wheelSizes,
+  caliperColours,
   stanceLevels,
   exhaustOptions,
   headlightOptions,
@@ -85,6 +86,7 @@ const FACTORY = {
   finish: "glossy",
   wheelType: "sport",
   wheelSize: 1,
+  caliper: "#c0242c",
   stance: 0,
   spoilerType: "stock",
   exhaustType: "stock",
@@ -115,6 +117,7 @@ export default function Showroom() {
   const [wheelType, setWheelType] = useState(FACTORY.wheelType);
   const [spoilerType, setSpoilerType] = useState(FACTORY.spoilerType);
   const [wheelSize, setWheelSize] = useState(FACTORY.wheelSize);
+  const [caliper, setCaliper] = useState(FACTORY.caliper);
   const [stance, setStance] = useState(FACTORY.stance);
   const [exhaustType, setExhaustType] = useState(FACTORY.exhaustType);
   const [headlightType, setHeadlightType] = useState(FACTORY.headlightType);
@@ -130,9 +133,31 @@ export default function Showroom() {
 
   const [quiet, setQuiet] = useState(() => sound.isMuted());
 
+  const [engineOn, setEngineOn] = useState(false);
+
+  // Leaving the engine running is a state rather than a gesture, so it gets its
+  // own switch. Off by default: a noise that starts on its own is a noise
+  // people close the tab over.
+  const toggleEngine = useCallback(() => {
+    setEngineOn((running) => {
+      if (running) {
+        sound.stopIdle();
+        return false;
+      }
+      // Refuses if sound is muted, in which case the switch should not move.
+      return sound.startIdle({ weight: 0.5 });
+    });
+  }, []);
+
+  // Leaving the configurator has to stop the engine, or it follows you around
+  // the rest of the site.
+  useEffect(() => () => sound.stopIdle(), []);
+
   const toggleSound = useCallback(() => {
     setQuiet((wasQuiet) => {
       sound.setMuted(!wasQuiet);
+      // Muting stops the engine, so the switch has to follow it down.
+      if (!wasQuiet) setEngineOn(false);
       // Play something on the way back on, so the button proves itself.
       if (wasQuiet) sound.tick();
       return !wasQuiet;
@@ -216,6 +241,7 @@ export default function Showroom() {
     applyFinish(FACTORY.finish);
     setWheelType(FACTORY.wheelType);
     setWheelSize(FACTORY.wheelSize);
+    setCaliper(FACTORY.caliper);
     setStance(FACTORY.stance);
     setSpoilerType(FACTORY.spoilerType);
     setExhaustType(FACTORY.exhaustType);
@@ -250,6 +276,7 @@ export default function Showroom() {
         if (spec.finish) applyFinish(spec.finish);
         if (spec.wheelType) setWheelType(spec.wheelType);
         if (spec.wheelSize !== undefined) setWheelSize(spec.wheelSize);
+        if (spec.caliper) setCaliper(spec.caliper);
         if (spec.stance !== undefined) setStance(spec.stance);
         if (spec.spoilerType) setSpoilerType(spec.spoilerType);
         if (spec.exhaustType) setExhaustType(spec.exhaustType);
@@ -288,6 +315,7 @@ export default function Showroom() {
       0
     ) +
     (aftermarket ? priceOf(wheelSizes, wheelSize) : 0) +
+    (aftermarket ? priceOf(caliperColours, caliper) : 0) +
     (aftermarket ? priceOf(stanceLevels, stance) : 0);
 
   // Everything the user has moved away from factory, which drives both the
@@ -295,6 +323,7 @@ export default function Showroom() {
   const stockSpec = {
     wheelType: "stock",
     wheelSize: 1,
+    caliper: FACTORY.caliper,
     stance: 0,
     spoilerType: "stock",
     exhaustType: "stock",
@@ -307,6 +336,7 @@ export default function Showroom() {
   const currentSpec = {
     wheelType,
     wheelSize: aftermarket ? wheelSize : 1,
+    caliper: aftermarket ? caliper : FACTORY.caliper,
     stance: aftermarket ? stance : 0,
     spoilerType,
     exhaustType,
@@ -346,6 +376,7 @@ export default function Showroom() {
     if (spec.finish) applyFinish(spec.finish);
     if (spec.wheelType) setWheelType(spec.wheelType);
     if (spec.wheelSize !== undefined) setWheelSize(spec.wheelSize);
+    if (spec.caliper) setCaliper(spec.caliper);
     if (spec.stance !== undefined) setStance(spec.stance);
     if (spec.spoilerType) setSpoilerType(spec.spoilerType);
     if (spec.exhaustType) setExhaustType(spec.exhaustType);
@@ -368,6 +399,7 @@ export default function Showroom() {
         finish,
         wheelType,
         wheelSize,
+        caliper,
         stance,
         spoilerType,
         exhaustType,
@@ -379,7 +411,7 @@ export default function Showroom() {
       }
     }),
     [
-      selectedCar, total, color, finish, wheelType, wheelSize, stance,
+      selectedCar, total, color, finish, wheelType, wheelSize, caliper, stance,
       spoilerType, exhaustType, headlightType, underglow, wrapMode,
       wrapColour, tintLevel
     ]
@@ -405,6 +437,7 @@ export default function Showroom() {
           wheelType={shown.wheelType}
           spoilerType={shown.spoilerType}
           wheelSize={shown.wheelSize}
+          caliper={shown.caliper}
           stance={shown.stance}
           exhaustType={shown.exhaustType}
           headlightType={shown.headlightType}
@@ -442,6 +475,26 @@ export default function Showroom() {
               </button>
             ))}
           </div>
+
+          <button
+            type="button"
+            onClick={toggleEngine}
+            disabled={quiet}
+            title={quiet ? "Turn sound on first" : engineOn ? "Stop the engine" : "Start the engine"}
+            aria-pressed={engineOn}
+            className={[
+              "flex items-center gap-2 px-3 py-2 text-[10px] tracking-widest uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+              engineOn ? "bg-signal text-ink" : "bg-ink/80 text-fog hover:text-chalk"
+            ].join(" ")}
+          >
+            <span
+              className={[
+                "block h-2 w-2 rounded-full",
+                engineOn ? "animate-pulse bg-ink" : "bg-current"
+              ].join(" ")}
+            />
+            {engineOn ? "Running" : "Ignition"}
+          </button>
 
           <button
             type="button"
@@ -533,14 +586,18 @@ export default function Showroom() {
         setSpoilerType={withSound(setSpoilerType, sound.clunk)}
         wheelSize={wheelSize}
         setWheelSize={withSound(setWheelSize, sound.tick)}
+        caliper={caliper}
+        setCaliper={withSound(setCaliper, sound.tick)}
         stance={stance}
         setStance={withSound(setStance, sound.clunk)}
         exhaustType={exhaustType}
-        setExhaustType={withSound(setExhaustType, (type) =>
-          type === "stock"
-            ? sound.tick()
-            : sound.rev({ weight: EXHAUST_WEIGHT[type] ?? 0.5 })
-        )}
+        setExhaustType={withSound(setExhaustType, (type) => {
+          const weight = EXHAUST_WEIGHT[type] ?? 0.4;
+          if (type === "stock") sound.tick();
+          else sound.rev({ weight });
+          // A different exhaust on a running engine should change how it idles.
+          sound.retuneIdle(weight);
+        })}
         headlightType={headlightType}
         setHeadlightType={withSound(setHeadlightType, sound.tick)}
         underglow={underglow}

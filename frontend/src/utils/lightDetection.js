@@ -33,6 +33,21 @@ const RULES = {
   pairSize: 0.6       // and how alike they must be
 };
 
+// Ten of the eighteen models do not build their lamps as a mirrored pair at
+// all. They carry a single part spanning most of the width of the car: a light
+// bar, or a lamp and its surround merged into one piece. Those are picked up
+// separately, and the thing that tells a light bar from the whole rear panel is
+// how flat it is. On the Mercedes the tail strip measures 0.01 deep and 0.10
+// tall; the Porsche's rear panel is 0.28 deep and 0.79 tall.
+const BAR = {
+  minWidth: 0.35,     // it has to actually span the car
+  maxWidth: 0.95,
+  maxOffset: 0.08,    // and sit on the centreline
+  maxTall: 0.14,      // a blade, not a panel
+  maxDepth: 0.08,
+  limit: 6            // more than this many and it is matching panel seams
+};
+
 // A lamp candidate: shallow, modest, and at one end of the car.
 function candidates(car, parts) {
   const { lengthAxis, widthAxis, midWidth, length, width, height, box, rearSign } = car;
@@ -56,19 +71,34 @@ function candidates(car, parts) {
     if (part.size.y > height * RULES.maxTall) continue;
 
     const across = part.size[widthAxis] / width;
-    if (across < RULES.minWidth || across > RULES.maxWidth) continue;
+    const offset = part.center[widthAxis] - midWidth;
+    const tall = part.size.y / height;
+    const deep = part.size[lengthAxis] / length;
 
-    // A last guard on sheer size, so nothing panel-shaped can reach the
-    // pairing stage however it is oriented.
-    const biggest = Math.max(part.size.x, part.size.y, part.size.z);
-    if (biggest > length * RULES.maxSpan) continue;
+    // A full width light bar, judged on how flat it is rather than how big.
+    const bar =
+      across >= BAR.minWidth &&
+      across <= BAR.maxWidth &&
+      Math.abs(offset) < width * BAR.maxOffset &&
+      tall <= BAR.maxTall &&
+      deep <= BAR.maxDepth;
+
+    if (!bar) {
+      if (across < RULES.minWidth || across > RULES.maxWidth) continue;
+
+      // A last guard on sheer size, so nothing panel-shaped can reach the
+      // pairing stage however it is oriented.
+      const biggest = Math.max(part.size.x, part.size.y, part.size.z);
+      if (biggest > length * RULES.maxSpan) continue;
+    }
 
     found.push({
       part,
       end: atFront ? "front" : "rear",
       along,
-      offset: part.center[widthAxis] - midWidth,
-      across
+      offset,
+      across,
+      bar
     });
   }
 
@@ -84,16 +114,18 @@ export function detectLights(car, parts) {
   const keep = new Set();
   const taken = new Set();
   let units = 0;
+  let bars = 0;
 
   for (let i = 0; i < found.length; i++) {
     if (taken.has(i)) continue;
     const a = found[i];
 
-    // A light bar running across the whole tail is a single centred unit
-    // rather than a pair, and is common on newer cars.
-    if (Math.abs(a.offset) < width * 0.05 && a.across > 0.3) {
+    // A light bar is a unit on its own rather than half of a pair.
+    if (a.bar) {
+      if (bars >= BAR.limit) continue;
       keep.add(a.part.ref);
       taken.add(i);
+      bars++;
       units++;
       continue;
     }
@@ -102,6 +134,7 @@ export function detectLights(car, parts) {
       if (taken.has(j)) continue;
       const b = found[j];
 
+      if (b.bar) continue;
       if (a.end !== b.end) continue;
 
       // Opposite sides of the car.

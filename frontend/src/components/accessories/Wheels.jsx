@@ -37,7 +37,7 @@ function Tire({ radius, width, sidewall }) {
   );
 }
 
-function SportWheel({ radius, width, sidewall }) {
+function SportWheel({ radius, width, sidewall, caliper }) {
   const rimRadius = radius * sidewall;
   const spokes = 10;
 
@@ -83,7 +83,7 @@ function SportWheel({ radius, width, sidewall }) {
         <meshStandardMaterial color="#1f2226" metalness={0.9} roughness={0.3} />
       </mesh>
 
-      {/* BRAKE DISC + RED CALIPER */}
+      {/* BRAKE DISC + CALIPER */}
       <mesh rotation={[Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[rimRadius * 0.68, rimRadius * 0.68, width * 0.1, 32]} />
         <meshStandardMaterial color="#8a8f96" metalness={1} roughness={0.45} />
@@ -91,7 +91,7 @@ function SportWheel({ radius, width, sidewall }) {
 
       <mesh position={[-rimRadius * 0.5, rimRadius * 0.2, 0]}>
         <boxGeometry args={[rimRadius * 0.3, rimRadius * 0.5, width * 0.3]} />
-        <meshStandardMaterial color="#c0242c" metalness={0.4} roughness={0.35} />
+        <meshStandardMaterial color={caliper} metalness={0.4} roughness={0.35} />
       </mesh>
     </>
   );
@@ -146,7 +146,38 @@ function ClassicWheel({ radius, width, sidewall }) {
   );
 }
 
-export default function Wheels({ type, wheels, axleAxis, sizeStep = 1 }) {
+// Swapping the wheels hides the ones the model came with, and on most cars that
+// leaves the arch as an open hole you can see straight through to the far side
+// of the car. A real car has a liner in there. This is that liner: a dark shell
+// behind the wheel, drawn inside out so it is only visible through the arch.
+function ArchLiner({ radius, width }) {
+  const shell = radius * 1.07;
+
+  return (
+    <>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[shell, shell, width * 2.1, 24, 1, true]} />
+        {/* side 1 is BackSide: the inside of the shell, not the outside */}
+        <meshStandardMaterial color="#0a0b0d" roughness={1} metalness={0} side={1} />
+      </mesh>
+
+      {/* The inboard cap, which is what actually stops daylight coming
+          through from the other side of the car. */}
+      <mesh position={[0, 0, -width * 1.02]}>
+        <circleGeometry args={[shell, 24]} />
+        <meshStandardMaterial color="#0a0b0d" roughness={1} metalness={0} side={2} />
+      </mesh>
+    </>
+  );
+}
+
+export default function Wheels({
+  type,
+  wheels,
+  axleAxis,
+  sizeStep = 1,
+  caliper = "#c0242c"
+}) {
 
   if (!wheels || type === "stock") return null;
 
@@ -177,11 +208,14 @@ export default function Wheels({ type, wheels, axleAxis, sizeStep = 1 }) {
         return (
         <group key={index} position={wheel.position} rotation={rotation}>
 
+          <ArchLiner radius={wheel.radius} width={wheel.thickness} />
+
           {type === "sport" ? (
             <SportWheel
               radius={wheel.radius}
               width={wheel.thickness}
               sidewall={sidewall}
+              caliper={caliper}
             />
           ) : (
             <ClassicWheel

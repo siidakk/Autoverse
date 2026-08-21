@@ -50,6 +50,7 @@ export function isMuted() {
 
 export function setMuted(next) {
   muted = next;
+  if (next) stopIdle();
   try {
     window.localStorage.setItem(STORAGE_KEY, next ? "off" : "on");
   } catch {
@@ -248,4 +249,86 @@ export function neon() {
     osc.start(t);
     osc.stop(t + 0.9);
   }
+}
+
+
+// --- the engine, left running ---
+//
+// A rev is a gesture. An idle is a state, so it is built once and kept, with
+// a slow wobble on top: a real engine at rest is never quite steady, and a
+// perfectly constant tone reads as a fridge rather than a car.
+
+let engine = null;
+
+export function idling() {
+  return Boolean(engine);
+}
+
+export function startIdle({ weight = 0.5 } = {}) {
+  const ctx = ready();
+  if (!ctx) return false;
+  if (engine) return true;
+
+  const t = ctx.currentTime;
+  const base = 48 - weight * 14;
+
+  const out = ctx.createGain();
+  out.gain.setValueAtTime(0.0001, t);
+  out.gain.exponentialRampToValueAtTime(0.05, t + 0.7);
+  out.connect(master);
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = 260 + weight * 140;
+  filter.Q.value = 3;
+  filter.connect(out);
+
+  const parts = [];
+
+  // The firing orders, roughly: the fundamental plus the two harmonics that
+  // carry most of what an idle actually sounds like.
+  for (const [multiplier, detune] of [[1, 0], [2, 6], [3, -9]]) {
+    const osc = ctx.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.value = base * multiplier;
+    osc.detune.value = detune;
+    osc.connect(filter);
+    osc.start(t);
+    parts.push(osc);
+  }
+
+  // The lump. Slow, shallow, and enough to stop it sounding synthetic.
+  const wobble = ctx.createOscillator();
+  const wobbleDepth = ctx.createGain();
+  wobble.type = "sine";
+  wobble.frequency.value = 5.5;
+  wobbleDepth.gain.value = base * 0.05;
+  wobble.connect(wobbleDepth);
+  for (const osc of parts) wobbleDepth.connect(osc.frequency);
+  wobble.start(t);
+  parts.push(wobble);
+
+  engine = { out, parts };
+  return true;
+}
+
+export function stopIdle() {
+  if (!engine || !context) return;
+
+  const { out, parts } = engine;
+  engine = null;
+
+  const t = context.currentTime;
+  out.gain.cancelScheduledValues(t);
+  out.gain.setValueAtTime(Math.max(out.gain.value, 0.0001), t);
+  out.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+
+  for (const node of parts) node.stop(t + 0.5);
+}
+
+// Fitting a different exhaust while the engine is running should be audible.
+export function retuneIdle(weight) {
+  if (!engine) return;
+  stopIdle();
+  window.setTimeout(() => startIdle({ weight }), 120);
 }

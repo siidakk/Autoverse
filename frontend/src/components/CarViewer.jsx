@@ -172,6 +172,7 @@ export default function CarViewer({
   wheelType,
   spoilerType,
   wheelSize,
+  caliper,
   stance,
   exhaustType,
   headlightType,
@@ -234,6 +235,7 @@ export default function CarViewer({
           wheelType={wheelType}
           spoilerType={spoilerType}
           wheelSize={wheelSize}
+          caliper={caliper}
           stance={stance}
           exhaustType={exhaustType}
           headlightType={headlightType}

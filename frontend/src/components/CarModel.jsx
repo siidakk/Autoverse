@@ -8,6 +8,7 @@ import Headlights from "./accessories/Headlights";
 import Underglow from "./accessories/Underglow";
 import { inspectCar, detectWheels, detectLights } from "../utils/carGeometry";
 import { looksLikeTrim } from "../utils/lightDetection";
+import { overrideFor } from "../data/carParts";
 import { applyWrap, isWrapped } from "../utils/wrapShader";
 
 // Every model arrives at a different scale and sitting at a different height,
@@ -21,6 +22,7 @@ export default function CarModel({
   wheelType,
   spoilerType,
   wheelSize = 1,
+  caliper = "#c0242c",
   stance = 0,
   exhaustType = "stock",
   headlightType = "stock",
@@ -31,6 +33,10 @@ export default function CarModel({
 }) {
 
   const { scene } = useGLTF(car.model);
+
+  // Held separately because the effect below shadows `car` with the
+  // measurement, and the overrides are keyed by the model path.
+  const modelPath = car.model;
 
   // Which scene's materials have already been cloned for this configurator.
   const clonedFor = useRef(null);
@@ -174,13 +180,19 @@ export default function CarModel({
       // that is taken as well. Each mesh already has its own cloned material
       // above, so skipping one works even where the model shared a material
       // between a lamp and a panel.
-      if (
-        lightMeshes.has(child) ||
-        looksLikeTrim(child.name) ||
-        looksLikeTrim(material.name)
-      ) {
-        return;
-      }
+      //
+      // data/carParts.js can overrule either way, for the models where the
+      // measurement cannot be right because the lamp is not separate geometry.
+      const forced = overrideFor(modelPath, child.name, material.name);
+
+      const keepStock =
+        forced === null
+          ? lightMeshes.has(child) ||
+            looksLikeTrim(child.name) ||
+            looksLikeTrim(material.name)
+          : forced;
+
+      if (keepStock) return;
 
       // BASE COLOR
       material.color = new THREE.Color(color);
@@ -213,7 +225,52 @@ export default function CarModel({
       material.needsUpdate = true;
     });
 
-  }, [scene, color, paint, detected, measurements, fit, drop, wrap, tint]);
+  }, [scene, color, paint, detected, measurements, fit, drop, wrap, tint, modelPath]);
+
+  // A way to see what the classifier decided, so the overrides in
+  // data/carParts.js can be written against the real names instead of guessed
+  // at. Called from the browser console as __autoverseParts().
+  useEffect(() => {
+    if (!measurements) return;
+
+    const { car: measured, lights } = measurements;
+    const wheelMeshes = new Set(detected?.meshes ?? []);
+
+    window.__autoverseParts = () => {
+      const rows = measurements.car.parts.map((part) => {
+        const mesh = part.ref;
+        const materialName = mesh.material?.name ?? "";
+        const forced = overrideFor(modelPath, mesh.name, materialName);
+
+        const stock =
+          forced === null
+            ? lights.meshes.has(mesh) ||
+              looksLikeTrim(mesh.name) ||
+              looksLikeTrim(materialName)
+            : forced;
+
+        return {
+          mesh: mesh.name || "(unnamed)",
+          material: materialName || "(unnamed)",
+          takes: wheelMeshes.has(mesh) ? "wheel" : stock ? "stock" : "paint",
+          alongCar: +((part.center[measured.lengthAxis] - measured.box.min[measured.lengthAxis]) / measured.length).toFixed(2),
+          upCar: +((part.center.y - measured.box.min.y) / measured.height).toFixed(2),
+          offCentre: +((part.center[measured.widthAxis] - measured.midWidth) / measured.width).toFixed(2),
+          width: +(part.size[measured.widthAxis] / measured.width).toFixed(2),
+          tall: +(part.size.y / measured.height).toFixed(2),
+          deep: +(part.size[measured.lengthAxis] / measured.length).toFixed(2)
+        };
+      });
+
+      console.table(rows);
+      console.log(
+        `${modelPath}: ${rows.filter((r) => r.takes === "paint").length} painted, ` +
+        `${rows.filter((r) => r.takes === "stock").length} left stock, ` +
+        `${rows.filter((r) => r.takes === "wheel").length} wheels`
+      );
+      return rows;
+    };
+  }, [measurements, detected, modelPath]);
 
   // Placing a decal records where on the panel it landed, in that panel's own
   // space, so it travels with the car rather than hanging in the air.
@@ -266,6 +323,7 @@ export default function CarModel({
         wheels={detected?.wheels}
         axleAxis={detected?.axleAxis}
         sizeStep={wheelSize}
+        caliper={caliper}
       />
     </group>
   );

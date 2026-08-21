@@ -8,6 +8,7 @@ import {
   wheelOptions,
   spoilerOptions,
   wheelSizes,
+  caliperColours,
   stanceLevels,
   exhaustOptions,
   headlightOptions,
@@ -216,6 +217,8 @@ export default function ControlPanel({
   setSpoilerType,
   wheelSize,
   setWheelSize,
+  caliper,
+  setCaliper,
   stance,
   setStance,
   exhaustType,
@@ -326,6 +329,45 @@ export default function ControlPanel({
                     ].join(" ")}
                   >
                     <span className="readout block text-[11px]">{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* CALIPERS - visible through the spokes, so worth choosing */}
+            <div className={stock ? "opacity-40" : ""}>
+              <p className="label">Brake calipers</p>
+              <div className="mt-2 flex gap-px bg-line-soft">
+                {caliperColours.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    disabled={stock}
+                    onClick={() => setCaliper(option.value)}
+                    title={`${option.label} — ${option.note}`}
+                    aria-label={option.label}
+                    className={[
+                      "group relative flex-1 py-3 transition-colors disabled:cursor-not-allowed",
+                      caliper === option.value && !stock ? "bg-panel" : "bg-ink hover:bg-panel/60"
+                    ].join(" ")}
+                  >
+                    <span
+                      className="mx-auto block h-5 w-5 border transition-transform"
+                      style={{
+                        backgroundColor: option.value,
+                        borderColor:
+                          caliper === option.value && !stock
+                            ? "var(--color-signal, #f0a500)"
+                            : "transparent",
+                        transform:
+                          caliper === option.value && !stock ? "scale(1.15)" : "none"
+                      }}
+                    />
+                    {option.price > 0 && (
+                      <span className="readout mt-1 block text-center text-[9px] text-fog">
+                        +{option.price / 1000}k
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>

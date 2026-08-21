@@ -22,6 +22,17 @@ export const wheelSizes = [
   { value: 3, label: "+2\"", note: "Stretched look", price: 4500 }
 ];
 
+// Brake calipers. Painting them is one of the cheapest things anyone actually
+// does to a car, and it is the one modification you can see through the spokes
+// of the wheels already fitted.
+export const caliperColours = [
+  { value: "#c0242c", label: "Red", note: "The obvious one", price: 0 },
+  { value: "#1f2226", label: "Black", note: "Factory, hides brake dust", price: 0 },
+  { value: "#d8a520", label: "Gold", note: "Track day", price: 1500 },
+  { value: "#2f6fd0", label: "Blue", note: "Cool against silver", price: 1500 },
+  { value: "#cbd2d8", label: "Silver", note: "Standard cast finish", price: 0 }
+];
+
 // Ride height as a fraction of how far the body can drop before it meets the
 // road, so every car lowers by an amount that suits its own proportions.
 export const stanceLevels = [
