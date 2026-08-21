@@ -19,13 +19,18 @@ app.get("/health", (req, res) => {
   const states = ["disconnected", "connected", "connecting", "disconnecting"]
   const database = states[mongoose.connection.readyState] ?? "unknown"
 
+  const hosted = process.env.NODE_ENV === "production"
+
   res.status(200).json({
     status: "ok",
     database,
     accountsWork: database === "connected",
     note: database === "connected"
       ? "Accounts and saved builds are working."
-      : "The API is running but has no database, so accounts and saving are off. Start one with: cd backend && npm run db:local"
+      : hosted
+        // Telling a hosted service to run a database on a laptop helps nobody.
+        ? "The API is running but MONGO_URI does not point at a reachable database. Set it in the service's environment to an Atlas connection string."
+        : "The API is running but has no database, so accounts and saving are off. Start one with: cd backend && npm run db:local"
   })
 })
 
