@@ -1,4 +1,4 @@
-import { lowerBodyEnd } from "../../utils/placement";
+import { lowerBodyEnd, rearValance } from "../../utils/placement";
 
 // Exhaust tips tuck under the rear valance. A real tip is about a tenth of a
 // metre across on a four and a half metre car, so everything here is kept to
@@ -8,47 +8,58 @@ const CHROME = { color: "#c6ccd4", metalness: 1, roughness: 0.18 };
 const CARBON = { color: "#191b1f", metalness: 0.4, roughness: 0.45 };
 const BURNT = { color: "#6d5240", metalness: 0.9, roughness: 0.35 };
 
-// radius and spread are fractions of the car's length and track.
+// Radius is a fraction of the car's length. Spread is a fraction of how far
+// the rear valance itself reaches sideways, so tips stay under the bumper on a
+// narrow hatchback and on a wide pickup alike.
 const layouts = {
-  twin: { pairs: 1, spread: 0.34, radius: 0.012, material: CHROME },
-  quad: { pairs: 2, spread: 0.4, radius: 0.0105, material: CHROME },
-  centre: { pairs: 1, spread: 0.07, radius: 0.014, material: BURNT },
-  carbon: { pairs: 1, spread: 0.34, radius: 0.016, material: CARBON }
+  twin: { pairs: 1, spread: 0.62, radius: 0.012, material: CHROME },
+  quad: { pairs: 2, spread: 0.66, radius: 0.0105, material: CHROME },
+  centre: { pairs: 1, spread: 0.16, radius: 0.014, material: BURNT },
+  carbon: { pairs: 1, spread: 0.62, radius: 0.016, material: CARBON }
 };
 
-export default function Exhaust({ type, car, wheels }) {
+export default function Exhaust({ type, car }) {
 
   if (!type || type === "stock" || !car) return null;
 
   const layout = layouts[type];
   if (!layout) return null;
 
-  const { lengthAxis, widthAxis, midWidth, length, width, height, box, rearSign } = car;
+  const { lengthAxis, widthAxis, midWidth, length, box, rearSign } = car;
 
   // The back of the car measured low down, so a roof spoiler or a raised wing
   // cannot drag the tips out behind the bumper.
   const rearEnd = lowerBodyEnd(car);
+  const valance = rearValance(car);
 
   const tipRadius = length * layout.radius;
   const tipLength = length * 0.04;
 
-  // Sat just above the road, under the valance.
-  const up = box.min.y + height * 0.14;
+  // Just under the valance, and never allowed through the road surface. The
+  // old fixed fraction of body height put the tips in mid air under a tall car
+  // and inside the bumper of a low one.
+  const up = Math.max(
+    valance.floor + tipRadius * 0.55,
+    box.min.y + tipRadius * 1.15
+  );
 
-  // Measured across the wheels where possible; the bounding box picks up
-  // mirrors and wings that have nothing to do with where a pipe sits.
-  const span = wheels?.track ?? width * 0.78;
+  // Kept inboard of the corners of the bumper itself. Spacing off the wheel
+  // track pushed them out towards the arches, which is what made every car look
+  // wrong in the same way.
+  const usable = Math.max(valance.halfWidth - tipRadius * 1.6, tipRadius * 1.2);
 
   const offsets = [];
   for (let pair = 0; pair < layout.pairs; pair++) {
-    const lateral = span * layout.spread - pair * tipRadius * 2.8;
+    const lateral = usable * layout.spread - pair * tipRadius * 2.6;
     offsets.push(lateral, -lateral);
   }
 
   const place = (lateral) => {
     const position = [0, up, 0];
-    // Mostly tucked under, protruding only slightly past the bumper.
-    position[lengthAxis === "x" ? 0 : 2] = rearEnd + rearSign * tipLength * 0.15;
+    // Recessed under the bumper with only the last fifth of the tip showing.
+    // This used to add the offset along rearSign, which pushed the whole tip
+    // out behind the car instead of tucking it in.
+    position[lengthAxis === "x" ? 0 : 2] = rearEnd - rearSign * tipLength * 0.3;
     position[widthAxis === "x" ? 0 : 2] = midWidth + lateral;
     return position;
   };

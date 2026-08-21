@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "validate:models": "node tools/validate-model.mjs public/models",
     "test:placement": "node tools/test-placement.mjs public/models",
-    "compress:models": "node tools/compress-models.mjs public/models --replace"
+    "compress:models": "node tools/compress-models.mjs public/models --replace",
+    "test:lights": "node tools/test-lights.mjs public/models"
   },
   "dependencies": {
     "@pmndrs/assets": "^1.7.0",

@@ -155,11 +155,26 @@ export default function Wheels({ type, wheels, axleAxis, sizeStep = 1 }) {
 
   // Geometry above is built around local Z, so swap it onto X when the car's
   // axles run that way.
-  const rotation = axleAxis === "x" ? [0, Math.PI / 2, 0] : [0, 0, 0];
+  const axleIndex = axleAxis === "x" ? 0 : 2;
+  const base = axleAxis === "x" ? Math.PI / 2 : 0;
+
+  // The centreline, taken from the wheels themselves since they arrive as
+  // mirrored pairs. Nothing else has to be passed in for this.
+  const centreline =
+    wheels.reduce((sum, wheel) => sum + wheel.position[axleIndex], 0) /
+    wheels.length;
 
   return (
     <>
-      {wheels.map((wheel, index) => (
+      {wheels.map((wheel, index) => {
+        // Rim face, lip, spokes and hub are all modelled on the +Z side, so a
+        // wheel on the far side of the car has to be turned to face out. Giving
+        // all four the same rotation left one side showing the blank back of
+        // the tyre, which is exactly what it looked like.
+        const outward = wheel.position[axleIndex] >= centreline ? 1 : -1;
+        const rotation = [0, base + (outward < 0 ? Math.PI : 0), 0];
+
+        return (
         <group key={index} position={wheel.position} rotation={rotation}>
 
           {type === "sport" ? (
@@ -177,7 +192,8 @@ export default function Wheels({ type, wheels, axleAxis, sizeStep = 1 }) {
           )}
 
         </group>
-      ))}
+        );
+      })}
     </>
   );
 }

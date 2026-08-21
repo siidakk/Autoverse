@@ -10,105 +10,15 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { measureCar, detectWheels, boundsOf } from "../src/utils/wheelDetection.js";
-import { lowerBodyEnd, noseEnd } from "../src/utils/placement.js";
+import { measureCar, detectWheels } from "../src/utils/wheelDetection.js";
+import { lowerBodyEnd, noseEnd, rearValance } from "../src/utils/placement.js";
 
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
 const DIM = "\x1b[2m";
 const OFF = "\x1b[0m";
 
-// --- minimal glTF reader, same approach as the validator ---
-
-function multiply(a, b) {
-  const out = new Array(16).fill(0);
-  for (let c = 0; c < 4; c++) {
-    for (let r = 0; r < 4; r++) {
-      out[c * 4 + r] =
-        a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] +
-        a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
-    }
-  }
-  return out;
-}
-
-function localMatrix(node) {
-  if (node.matrix) return node.matrix.slice();
-  const [tx, ty, tz] = node.translation || [0, 0, 0];
-  const [x, y, z, w] = node.rotation || [0, 0, 0, 1];
-  const [sx, sy, sz] = node.scale || [1, 1, 1];
-  const x2 = x + x, y2 = y + y, z2 = z + z;
-  const xx = x * x2, xy = x * y2, xz = x * z2;
-  const yy = y * y2, yz = y * z2, zz = z * z2;
-  const wx = w * x2, wy = w * y2, wz = w * z2;
-  return [
-    (1 - (yy + zz)) * sx, (xy + wz) * sx, (xz - wy) * sx, 0,
-    (xy - wz) * sy, (1 - (xx + zz)) * sy, (yz + wx) * sy, 0,
-    (xz + wy) * sz, (yz - wx) * sz, (1 - (xx + yy)) * sz, 0,
-    tx, ty, tz, 1
-  ];
-}
-
-const NORMALISERS = { 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 };
-
-function denormalise(accessor, value) {
-  if (!accessor.normalized) return value;
-  const divisor = NORMALISERS[accessor.componentType];
-  return divisor ? Math.max(value / divisor, -1) : value;
-}
-
-function partsOf(file) {
-  const buffer = fs.readFileSync(file);
-  const json = JSON.parse(
-    buffer.subarray(20, 20 + buffer.readUInt32LE(12)).toString("utf8")
-  );
-
-  const nodes = json.nodes || [];
-  const roots = json.scenes?.[json.scene ?? 0]?.nodes ?? [];
-  const parts = [];
-
-  const walk = (index, parentMatrix, inherited) => {
-    const node = nodes[index];
-    if (!node) return;
-
-    const world = multiply(parentMatrix, localMatrix(node));
-    const name = node.name || inherited;
-
-    if (node.mesh !== undefined) {
-      for (const primitive of json.meshes[node.mesh].primitives || []) {
-        const accessor = json.accessors?.[primitive.attributes?.POSITION];
-        if (!accessor?.min) continue;
-
-        const min = { x: Infinity, y: Infinity, z: Infinity };
-        const max = { x: -Infinity, y: -Infinity, z: -Infinity };
-
-        for (let corner = 0; corner < 8; corner++) {
-          const local = [
-            denormalise(accessor, corner & 1 ? accessor.max[0] : accessor.min[0]),
-            denormalise(accessor, corner & 2 ? accessor.max[1] : accessor.min[1]),
-            denormalise(accessor, corner & 4 ? accessor.max[2] : accessor.min[2])
-          ];
-          const point = {
-            x: world[0] * local[0] + world[4] * local[1] + world[8] * local[2] + world[12],
-            y: world[1] * local[0] + world[5] * local[1] + world[9] * local[2] + world[13],
-            z: world[2] * local[0] + world[6] * local[1] + world[10] * local[2] + world[14]
-          };
-          for (const axis of ["x", "y", "z"]) {
-            min[axis] = Math.min(min[axis], point[axis]);
-            max[axis] = Math.max(max[axis], point[axis]);
-          }
-        }
-
-        parts.push({ ref: name, name: name || "unnamed", ...boundsOf(min, max) });
-      }
-    }
-
-    for (const child of node.children || []) walk(child, world, name);
-  };
-
-  for (const root of roots) walk(root, localMatrix({}), null);
-  return parts;
-}
+import { partsOf } from "./readGlb.mjs";
 
 // --- the checks ---
 
@@ -145,12 +55,80 @@ for (const file of files) {
     if (Math.abs(rear - nose) < car.length * 0.4)
       problems.push(`nose and rear are only ${(Math.abs(rear - nose) / car.length).toFixed(2)} of the car apart`);
 
-    // Tips are sized off length and spaced off track; both must stay inboard.
+    // Each wheel is turned to face out of its own side of the car. Getting
+    // this wrong is invisible from one side and obvious from the other, which
+    // is exactly how it shipped, so it is checked here on real geometry.
     if (wheels) {
-      const tipRadius = car.length * 0.012;
-      const lateral = wheels.track * 0.4;
-      if (lateral + tipRadius > car.width / 2)
-        problems.push("exhaust tips would sit outside the bodywork");
+      const axleIndex = wheels.axleAxis === "x" ? 0 : 2;
+      const centreline =
+        wheels.wheels.reduce((sum, w) => sum + w.position[axleIndex], 0) /
+        wheels.wheels.length;
+
+      const facing = wheels.wheels.map((wheel) => {
+        const outward = wheel.position[axleIndex] >= centreline ? 1 : -1;
+        const yaw = (wheels.axleAxis === "x" ? Math.PI / 2 : 0) + (outward < 0 ? Math.PI : 0);
+
+        // Where the rim face, built on local +Z, actually ends up pointing.
+        const points = wheels.axleAxis === "x" ? Math.sin(yaw) : Math.cos(yaw);
+        return { outward, points: Math.round(points) };
+      });
+
+      const left = facing.filter((f) => f.outward > 0).length;
+      if (left !== facing.length / 2)
+        problems.push(`${left} of ${facing.length} wheels ended up on one side`);
+
+      // The rim face must point the same way as the side the wheel is on.
+      const wrong = facing.filter((f) => f.points !== f.outward).length;
+      if (wrong) problems.push(`${wrong} wheels face into the car`);
+    }
+
+    // The exhaust is now placed against the measured rear valance, so the
+    // checks follow the same arithmetic the component runs.
+    const valance = rearValance(car);
+
+    if (!Number.isFinite(valance.floor)) problems.push("valance floor is not a number");
+    if (!Number.isFinite(valance.halfWidth)) problems.push("valance width is not a number");
+
+    if (valance.floor < car.box.min.y - 1e-6 || valance.floor > car.box.min.y + car.height * 0.6)
+      problems.push(
+        `valance floor sits ${((valance.floor - car.box.min.y) / car.height * 100).toFixed(0)}% up the car`
+      );
+
+    for (const [label, layout] of Object.entries({
+      twin: { pairs: 1, spread: 0.62, radius: 0.012 },
+      quad: { pairs: 2, spread: 0.66, radius: 0.0105 },
+      centre: { pairs: 1, spread: 0.16, radius: 0.014 },
+      carbon: { pairs: 1, spread: 0.62, radius: 0.016 }
+    })) {
+      const tipRadius = car.length * layout.radius;
+      const tipLength = car.length * 0.04;
+      const up = Math.max(valance.floor + tipRadius * 0.55, car.box.min.y + tipRadius * 1.15);
+      const usable = Math.max(valance.halfWidth - tipRadius * 1.6, tipRadius * 1.2);
+
+      // Never through the road.
+      if (up - tipRadius < car.box.min.y - 1e-6)
+        problems.push(`${label} tips go through the floor`);
+
+      // An exhaust belongs low down, not up the back panel.
+      if (up > car.box.min.y + car.height * 0.42)
+        problems.push(
+          `${label} tips sit ${((up - car.box.min.y) / car.height * 100).toFixed(0)}% up the car`
+        );
+
+      for (let pair = 0; pair < layout.pairs; pair++) {
+        const lateral = usable * layout.spread - pair * tipRadius * 2.6;
+
+        if (lateral < 0) problems.push(`${label} inner tip crosses the centreline`);
+
+        if (Math.abs(lateral) + tipRadius > car.width / 2 + 1e-6)
+          problems.push(`${label} tips would sit outside the bodywork`);
+      }
+
+      // The tip is recessed, so its rear face must not reach past the car.
+      const along = rear - car.rearSign * tipLength * 0.3;
+      const back = along + car.rearSign * tipLength * 0.5;
+      if (back < lo - car.length * 0.02 || back > hi + car.length * 0.02)
+        problems.push(`${label} tips hang out behind the car`);
     }
 
     if (problems.length) {

@@ -6,7 +6,8 @@ import Spoiler from "./accessories/Spoiler";
 import Exhaust from "./accessories/Exhaust";
 import Headlights from "./accessories/Headlights";
 import Underglow from "./accessories/Underglow";
-import { inspectCar, detectWheels } from "../utils/carGeometry";
+import { inspectCar, detectWheels, detectLights } from "../utils/carGeometry";
+import { looksLikeTrim } from "../utils/lightDetection";
 import { applyWrap, isWrapped } from "../utils/wrapShader";
 
 // Every model arrives at a different scale and sitting at a different height,
@@ -38,7 +39,11 @@ export default function CarModel({
     const measured = inspectCar(scene);
     if (!measured) return null;
 
-    return { car: measured, wheels: detectWheels(measured) };
+    return {
+      car: measured,
+      wheels: detectWheels(measured),
+      lights: detectLights(measured)
+    };
   }, [scene]);
 
   const fit = useMemo(() => {
@@ -102,6 +107,12 @@ export default function CarModel({
 
     // Tyres and rims keep their own materials instead of taking body paint.
     const wheelMeshes = new Set(detected?.meshes ?? []);
+
+    // Nor do the light units. Painting a car used to turn its headlights and
+    // tail lights the body colour, which is the single thing that gives away
+    // that none of this is real. They are found by measurement, because the
+    // material names in these models cannot be trusted to say what anything is.
+    const lightMeshes = measurements.lights?.meshes ?? new Set();
     const car = measurements.car;
 
     const freshScene = clonedFor.current !== scene;
@@ -155,6 +166,19 @@ export default function CarModel({
         material.roughness = 0.06;
         material.metalness = 0;
         material.needsUpdate = true;
+        return;
+      }
+
+      // Lamps, chrome, badges and the cabin keep what they came with. The
+      // measurement finds most lamps; where a model does bother to name a part,
+      // that is taken as well. Each mesh already has its own cloned material
+      // above, so skipping one works even where the model shared a material
+      // between a lamp and a panel.
+      if (
+        lightMeshes.has(child) ||
+        looksLikeTrim(child.name) ||
+        looksLikeTrim(material.name)
+      ) {
         return;
       }
 
@@ -225,7 +249,7 @@ export default function CarModel({
           track={detected?.track}
         />
 
-        <Exhaust type={exhaustType} car={measurements?.car} wheels={detected} />
+        <Exhaust type={exhaustType} car={measurements?.car} />
 
         <Headlights type={headlightType} car={measurements?.car} />
       </group>

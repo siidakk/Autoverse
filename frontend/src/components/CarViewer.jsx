@@ -272,14 +272,24 @@ export default function CarViewer({
         color="#000000"
       />
 
+      {/* Damping is what makes this feel like turning a car on a turntable
+          rather than dragging a stiff object: the movement carries a little
+          past the pointer and settles. The speeds are all below the defaults,
+          because at 1:1 a small flick of the mouse spins the car right past
+          the angle you wanted. */}
       <OrbitControls
         ref={controls}
+        makeDefault
+        enableDamping
+        dampingFactor={0.07}
+        rotateSpeed={0.45}
+        zoomSpeed={0.7}
         enablePan
         screenSpacePanning
-        panSpeed={0.6}
-        minDistance={3.5}
+        panSpeed={0.5}
+        minDistance={3.2}
         maxDistance={16}
-        minPolarAngle={0.1}
+        minPolarAngle={0.12}
         maxPolarAngle={Math.PI / 2.15}
         target={[0, 0.7, 0]}
       />

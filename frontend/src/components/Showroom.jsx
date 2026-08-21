@@ -25,6 +25,7 @@ import { CAMERA_VIEWS } from "../data/views";
 import { SCENES, sceneById } from "../data/scenes";
 import { loadBuild } from "../lib/api";
 import { noteViewed } from "../lib/recent";
+import * as sound from "../lib/sound";
 
 function CarList({ selected, onSelect }) {
   return (
@@ -76,6 +77,27 @@ function CarList({ selected, onSelect }) {
   );
 }
 
+// How a car arrives before anything is done to it. Written down once so the
+// opening state and the reset when a different car is picked cannot drift
+// apart.
+const FACTORY = {
+  color: "#d8dce1",
+  finish: "glossy",
+  wheelType: "sport",
+  wheelSize: 1,
+  stance: 0,
+  spoilerType: "stock",
+  exhaustType: "stock",
+  headlightType: "stock",
+  underglow: "off",
+  wrapMode: "none",
+  wrapColour: "#0c0d0f",
+  tintLevel: "clear"
+};
+
+// How much engine each exhaust implies, which is what the rev is built from.
+const EXHAUST_WEIGHT = { twin: 0.45, quad: 0.8, centre: 0.6, carbon: 0.9 };
+
 export default function Showroom() {
 
   // Arriving from a photo carries a car and its paint in the link. Read once,
@@ -87,24 +109,49 @@ export default function Showroom() {
 
   const [color, setColor] = useState(() => {
     const paint = new URLSearchParams(window.location.search).get("colour");
-    return /^#[0-9a-f]{6}$/i.test(paint ?? "") ? paint : "#d8dce1";
+    return /^#[0-9a-f]{6}$/i.test(paint ?? "") ? paint : FACTORY.color;
   });
-  const [finish, setFinish] = useState("glossy");
-  const [wheelType, setWheelType] = useState("sport");
-  const [spoilerType, setSpoilerType] = useState("stock");
-  const [wheelSize, setWheelSize] = useState(1);
-  const [stance, setStance] = useState(0);
-  const [exhaustType, setExhaustType] = useState("stock");
-  const [headlightType, setHeadlightType] = useState("stock");
-  const [underglow, setUnderglow] = useState("off");
-  const [wrapMode, setWrapMode] = useState("none");
-  const [wrapColour, setWrapColour] = useState("#0c0d0f");
-  const [tintLevel, setTintLevel] = useState("clear");
+  const [finish, setFinish] = useState(FACTORY.finish);
+  const [wheelType, setWheelType] = useState(FACTORY.wheelType);
+  const [spoilerType, setSpoilerType] = useState(FACTORY.spoilerType);
+  const [wheelSize, setWheelSize] = useState(FACTORY.wheelSize);
+  const [stance, setStance] = useState(FACTORY.stance);
+  const [exhaustType, setExhaustType] = useState(FACTORY.exhaustType);
+  const [headlightType, setHeadlightType] = useState(FACTORY.headlightType);
+  const [underglow, setUnderglow] = useState(FACTORY.underglow);
+  const [wrapMode, setWrapMode] = useState(FACTORY.wrapMode);
+  const [wrapColour, setWrapColour] = useState(FACTORY.wrapColour);
+  const [tintLevel, setTintLevel] = useState(FACTORY.tintLevel);
   const [view, setView] = useState("hero");
   const [stageId, setStageId] = useState("studio");
   const [comparing, setComparing] = useState(false);
 
   const stage = sceneById(stageId);
+
+  const [quiet, setQuiet] = useState(() => sound.isMuted());
+
+  const toggleSound = useCallback(() => {
+    setQuiet((wasQuiet) => {
+      sound.setMuted(!wasQuiet);
+      // Play something on the way back on, so the button proves itself.
+      if (wasQuiet) sound.tick();
+      return !wasQuiet;
+    });
+  }, []);
+
+  // Fitting a part should sound like fitting a part. The noise is attached
+  // here rather than inside the panel so that every control gets one without
+  // thirty separate handlers having to remember to make it.
+  const withSound = useCallback(
+    (setter, play) => (value) => {
+      // Choosing the option you already have should stay silent.
+      setter((current) => {
+        if (current !== value) play(value);
+        return value;
+      });
+    },
+    []
+  );
 
   // Remembered on this device so the garage can offer a way back to it.
   useEffect(() => {
@@ -153,6 +200,38 @@ export default function Showroom() {
       clearcoat: finishes[next].clearcoat
     }));
   }, []);
+
+  // Picking a different car starts that car from factory. Carrying the previous
+  // car's paint, wheels and ride height across meant you were never looking at
+  // the car you just chose, only at the last one wearing a new shape.
+  //
+  // The room and the camera angle are how you are looking rather than what you
+  // built, so those stay where you left them.
+  const selectCar = useCallback((car) => {
+    if (car.id === selectedCar.id) return;
+
+    setSelectedCar(car);
+
+    setColor(FACTORY.color);
+    applyFinish(FACTORY.finish);
+    setWheelType(FACTORY.wheelType);
+    setWheelSize(FACTORY.wheelSize);
+    setStance(FACTORY.stance);
+    setSpoilerType(FACTORY.spoilerType);
+    setExhaustType(FACTORY.exhaustType);
+    setHeadlightType(FACTORY.headlightType);
+    setUnderglow(FACTORY.underglow);
+    setWrapMode(FACTORY.wrapMode);
+    setWrapColour(FACTORY.wrapColour);
+    setTintLevel(FACTORY.tintLevel);
+    setDecals([]);
+    setDecalDesign(null);
+    setComparing(false);
+
+    // A build code in the address bar belongs to the car that was open, so it
+    // goes with it rather than re-loading over the new choice.
+    setSearchParams({}, { replace: true });
+  }, [selectedCar.id, applyFinish, setSearchParams]);
 
   useEffect(() => {
     if (!sharedCode) return;
@@ -309,7 +388,13 @@ export default function Showroom() {
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col lg:flex-row">
 
-      <CarList selected={selectedCar} onSelect={setSelectedCar} />
+      <CarList
+        selected={selectedCar}
+        onSelect={(car) => {
+          if (car.id !== selectedCar.id) sound.clunk();
+          selectCar(car);
+        }}
+      />
 
       {/* VIEWPORT */}
       <div className="relative min-h-[45vh] flex-1">
@@ -341,7 +426,10 @@ export default function Showroom() {
               <button
                 key={option.id}
                 type="button"
-                onClick={() => setStageId(option.id)}
+                onClick={() => {
+                  if (option.id !== stageId) sound.whoosh();
+                  setStageId(option.id);
+                }}
                 title={option.note}
                 className={[
                   "px-3 py-2 text-[10px] tracking-widest uppercase transition-colors",
@@ -355,12 +443,40 @@ export default function Showroom() {
             ))}
           </div>
 
+          <button
+            type="button"
+            onClick={toggleSound}
+            title={quiet ? "Sound off" : "Sound on"}
+            aria-pressed={!quiet}
+            className={[
+              "flex items-center gap-2 px-3 py-2 text-[10px] tracking-widest uppercase transition-colors",
+              quiet
+                ? "bg-ink/80 text-fog hover:text-chalk"
+                : "bg-ink/80 text-signal hover:text-chalk"
+            ].join(" ")}
+          >
+            {/* Three bars that fall flat when muted, rather than an icon font */}
+            <span className="flex h-3 items-end gap-[2px]">
+              {[0.4, 1, 0.65].map((height, index) => (
+                <span
+                  key={index}
+                  className="w-[2px] bg-current transition-all duration-200"
+                  style={{ height: quiet ? "2px" : `${height * 12}px` }}
+                />
+              ))}
+            </span>
+            {quiet ? "Muted" : "Sound"}
+          </button>
+
           <div className="flex gap-px bg-line-soft">
             {CAMERA_VIEWS.map((preset) => (
               <button
                 key={preset.id}
                 type="button"
-                onClick={() => setView(preset.id)}
+                onClick={() => {
+                  if (preset.id !== view) sound.whoosh();
+                  setView(preset.id);
+                }}
                 className={[
                   "px-3 py-2 text-[10px] tracking-widest uppercase transition-colors",
                   view === preset.id
@@ -397,7 +513,7 @@ export default function Showroom() {
             </div>
 
             <div className="absolute bottom-0 left-0">
-              <p className="label">Drag to orbit · scroll to zoom</p>
+              <p className="label">Drag to orbit · scroll to zoom · right-drag to pan</p>
             </div>
           </div>
         </div>
@@ -412,28 +528,37 @@ export default function Showroom() {
         paint={paint}
         setPaint={setPaint}
         wheelType={wheelType}
-        setWheelType={setWheelType}
+        setWheelType={withSound(setWheelType, sound.clunk)}
         spoilerType={spoilerType}
-        setSpoilerType={setSpoilerType}
+        setSpoilerType={withSound(setSpoilerType, sound.clunk)}
         wheelSize={wheelSize}
-        setWheelSize={setWheelSize}
+        setWheelSize={withSound(setWheelSize, sound.tick)}
         stance={stance}
-        setStance={setStance}
+        setStance={withSound(setStance, sound.clunk)}
         exhaustType={exhaustType}
-        setExhaustType={setExhaustType}
+        setExhaustType={withSound(setExhaustType, (type) =>
+          type === "stock"
+            ? sound.tick()
+            : sound.rev({ weight: EXHAUST_WEIGHT[type] ?? 0.5 })
+        )}
         headlightType={headlightType}
-        setHeadlightType={setHeadlightType}
+        setHeadlightType={withSound(setHeadlightType, sound.tick)}
         underglow={underglow}
-        setUnderglow={setUnderglow}
+        setUnderglow={withSound(setUnderglow, (value) =>
+          value === "off" ? sound.tick() : sound.neon()
+        )}
         wrapMode={wrapMode}
-        setWrapMode={setWrapMode}
+        setWrapMode={withSound(setWrapMode, sound.tick)}
         wrapColour={wrapColour}
         setWrapColour={setWrapColour}
         tintLevel={tintLevel}
-        setTintLevel={setTintLevel}
+        setTintLevel={withSound(setTintLevel, sound.tick)}
         total={total}
         buildPayload={buildPayload}
-        onSaved={(code) => setSearchParams({ build: code }, { replace: true })}
+        onSaved={(code) => {
+          sound.launch();
+          setSearchParams({ build: code }, { replace: true });
+        }}
         restoring={restoring}
         comparing={comparing}
         setComparing={setComparing}

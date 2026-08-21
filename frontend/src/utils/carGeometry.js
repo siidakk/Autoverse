@@ -4,6 +4,7 @@ import {
   detectWheels as detectWheelsIn,
   boundsOf
 } from "./wheelDetection";
+import { detectLights as detectLightsIn } from "./lightDetection";
 
 // Turns a loaded glTF scene into the plain part list the detection algorithm
 // works on. The algorithm itself lives in wheelDetection.js so the command line
@@ -60,6 +61,13 @@ export function detectWheels(car) {
 
   // The algorithm hands back whatever ref it was given, which here is the mesh.
   return { ...found, meshes: found.refs };
+}
+
+// The light units, handed back as the meshes themselves so the paint pass can
+// simply skip them.
+export function detectLights(car) {
+  const found = detectLightsIn(car, car.parts);
+  return { ...found, meshes: new Set(found.refs) };
 }
 
 // Drops a ray onto the bodywork to find the exact height of the panel at a
