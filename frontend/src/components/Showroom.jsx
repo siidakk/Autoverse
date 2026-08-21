@@ -131,8 +131,10 @@ export default function Showroom() {
   const [stageId, setStageId] = useState("studio");
   const [comparing, setComparing] = useState(false);
 
-  // What this particular car has under the bonnet. Every noise it makes is
-  // built from these numbers rather than from a recording.
+  // What this particular car has under the bonnet. A recording of that engine
+  // is played if public/sounds has one; these numbers are what picks the
+  // recording, shifts it to the right pitch, and stand in for it when there is
+  // nothing to play.
   const engine = useMemo(() => engineFor(selectedCar.model), [selectedCar.model]);
 
   const stage = sceneById(stageId);
@@ -144,16 +146,18 @@ export default function Showroom() {
   // Leaving the engine running is a state rather than a gesture, so it gets its
   // own switch. Off by default: a noise that starts on its own is a noise
   // people close the tab over.
-  const toggleEngine = useCallback(() => {
-    setEngineOn((running) => {
-      if (running) {
-        sound.stopIdle();
-        return false;
-      }
-      // Refuses if sound is muted, in which case the switch should not move.
-      return sound.startIdle(engine);
-    });
-  }, [engine]);
+  //
+  // Starting it may have to fetch a recording first, so this waits and moves
+  // the switch on what actually happened rather than on what was asked for.
+  const toggleEngine = useCallback(async () => {
+    if (engineOn) {
+      sound.stopIdle();
+      setEngineOn(false);
+      return;
+    }
+
+    setEngineOn(await sound.startIdle(selectedCar.model, engine));
+  }, [engineOn, engine, selectedCar.model]);
 
   // Leaving the configurator has to stop the engine, or it follows you around
   // the rest of the site.
@@ -262,7 +266,7 @@ export default function Showroom() {
 
     // A running engine becomes the new car's engine rather than carrying the
     // old one's note across.
-    sound.retuneIdle(engineFor(car.model));
+    sound.retuneIdle(car.model, engineFor(car.model));
 
     // A build code in the address bar belongs to the car that was open, so it
     // goes with it rather than re-loading over the new choice.
@@ -491,7 +495,7 @@ export default function Showroom() {
           <button
             type="button"
             onClick={() =>
-              sound.revEngine(engine, {
+              sound.rev(selectedCar.model, engine, {
                 loudness: EXHAUST_LOUDNESS[exhaustType] ?? 1
               })
             }
@@ -624,7 +628,7 @@ export default function Showroom() {
         exhaustType={exhaustType}
         setExhaustType={withSound(setExhaustType, (type) => {
           if (type === "stock") sound.tick();
-          else sound.revEngine(engine, { loudness: EXHAUST_LOUDNESS[type] ?? 1 });
+          else sound.rev(selectedCar.model, engine, { loudness: EXHAUST_LOUDNESS[type] ?? 1 });
         })}
         headlightType={headlightType}
         setHeadlightType={withSound(setHeadlightType, sound.tick)}
@@ -641,7 +645,7 @@ export default function Showroom() {
         total={total}
         buildPayload={buildPayload}
         onSaved={(code) => {
-          sound.launch(engine);
+          sound.launch(selectedCar.model, engine);
           setSearchParams({ build: code }, { replace: true });
         }}
         restoring={restoring}

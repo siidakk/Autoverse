@@ -11,6 +11,7 @@
 
 import { cars } from "../src/data/cars.js";
 import { ENGINES, engineFor, firingHz } from "../src/data/engines.js";
+import { sampleFor, shiftFor } from "../src/data/engineSamples.js";
 
 const GREEN = "\x1b[32m", RED = "\x1b[31m", DIM = "\x1b[2m", OFF = "\x1b[0m";
 
@@ -75,6 +76,47 @@ check(
   "a two rotor at 3000 rpm should fire at 100 Hz, order 2"
 );
 console.log(`  ${DIM}RX-7 two rotor at 3000 rpm: ${firingHz(rx7, 3000).toFixed(0)} Hz, order 2 rather than half a cylinder count${OFF}`);
+
+// 5. Recorded audio, when there is any. With none configured every car has to
+//    fall through to the synthesiser rather than to silence.
+const recorded = cars.filter((car) => sampleFor(car.model, engineFor(car.model)));
+
+console.log(
+  `\n  ${DIM}recordings configured for ${recorded.length} of ${cars.length} cars; ` +
+  `the rest synthesise${OFF}`
+);
+
+for (const car of recorded) {
+  const choice = sampleFor(car.model, engineFor(car.model));
+  check(choice.idle || choice.rev, `${car.name}: a sample entry with no files`);
+  check(
+    choice.rate > 0.66 && choice.rate < 1.51,
+    `${car.name}: shifted ${choice.rate.toFixed(2)}x, too far to sound like itself`
+  );
+  console.log(`  ${DIM}${car.name.padEnd(24)} ${choice.source}${OFF}`);
+}
+
+// 6. The pitch shift itself. A V8 clip taken at a 6500 redline standing in for
+//    a V8 that runs to 7000 has to come out at exactly that ratio.
+const shift = shiftFor(
+  { cylinders: 8, redline: 7000 },
+  { cylinders: 8, redline: 6500 }
+);
+check(
+  Math.abs(shift - 7000 / 6500) < 1e-9,
+  `a same-layout shift should be the redline ratio, got ${shift}`
+);
+
+// Borrowing across layouts moves the pitch by the cylinder ratio too, which is
+// how a V12 ends up an octave above a six rather than merely faster.
+const octave = shiftFor(
+  { cylinders: 12, redline: 6000 },
+  { cylinders: 6, redline: 6000 }
+);
+check(
+  Math.abs(octave - 2) < 1e-9,
+  `twelve cylinders against six should be exactly 2x, got ${octave}`
+);
 
 if (problems.length) {
   console.log(`\n${RED}${problems.length} problem(s)${OFF}`);

@@ -10,6 +10,8 @@
 // refuse to start one before the user has interacted with the page, and every
 // sound here is triggered by a click, so by then it is allowed.
 
+import * as engineAudio from "./engineAudio";
+
 const STORAGE_KEY = "autoverse:sound";
 
 let context = null;
@@ -209,8 +211,9 @@ function orderOf(engine) {
   return engine.rotor ? 2 : engine.cylinders / 2;
 }
 
-// A blip of the throttle. `loudness` is what the exhaust does to it.
-export function revEngine(engine, { loudness = 1 } = {}) {
+// A blip of the throttle, synthesised. Callers want rev() below, which
+// reaches for a recording first.
+function synthRev(engine, { loudness = 1 } = {}) {
   const ctx = ready();
   if (!ctx) return 0;
 
@@ -355,15 +358,25 @@ export function revEngine(engine, { loudness = 1 } = {}) {
   return total;
 }
 
-// Saving a build. The one moment worth a proper send off.
-export function launch(engine) {
+// A blip of the throttle. A recording of the real engine if this car has one,
+// and the synthesiser only when it does not: no arrangement of oscillators
+// sounds as much like an engine as an engine does.
+export async function rev(model, engine, { loudness = 1 } = {}) {
   const ctx = ready();
   if (!ctx) return;
 
-  const total = revEngine(engine, { loudness: 1.15 }) || 1;
+  const played = await engineAudio.playRev(model, engine, ctx, master, { loudness });
+  if (!played && !muted) synthRev(engine, { loudness });
+}
+
+// Saving a build. The one moment worth a proper send off.
+export function launch(model, engine) {
+  if (!ready()) return;
+
+  rev(model, engine, { loudness: 1.15 });
 
   // A second blip on the way out, so it lifts rather than just stopping.
-  window.setTimeout(() => revEngine(engine, { loudness: 0.8 }), total * 620);
+  window.setTimeout(() => rev(model, engine, { loudness: 0.8 }), 780);
 }
 
 // Changing the room, or moving the camera to a preset.
@@ -427,11 +440,10 @@ export function idling() {
   return Boolean(running);
 }
 
-export function startIdle(engine) {
-  const ctx = ready();
-  if (!ctx) return false;
-  if (running) return true;
-
+// The synthesised idle, held at idle speed with the same harmonic recipe as
+// the rev. Returned as something stoppable so the caller does not care whether
+// it got this or a recording.
+function synthIdle(ctx, engine) {
   const t = ctx.currentTime;
   const base = (engine.idle / 60) * orderOf(engine);
 
@@ -448,9 +460,6 @@ export function startIdle(engine) {
 
   const parts = [];
 
-  // The same harmonic recipe as the rev, held at idle speed. A V12 ticking
-  // over at 850 sits at 85 Hz; a diesel four at 700 sits at 23 Hz, and you can
-  // hear which is which without being told.
   for (const [multiple, level] of harmonicsFor(engine)) {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -465,7 +474,6 @@ export function startIdle(engine) {
     parts.push(osc);
   }
 
-  // Diesel clatter, gated at the firing rate.
   if (engine.clatter > 0) {
     const knock = ctx.createOscillator();
     const knockGain = ctx.createGain();
@@ -479,9 +487,8 @@ export function startIdle(engine) {
     parts.push(knock);
   }
 
-  // The lump. Slow, shallow, and enough to stop it sounding synthetic: a real
-  // engine at rest is never quite steady, and a constant tone reads as a
-  // fridge rather than a car.
+  // The lump. A real engine at rest is never quite steady, and a constant tone
+  // reads as a fridge rather than a car.
   const wobble = ctx.createOscillator();
   const wobbleDepth = ctx.createGain();
 
@@ -495,27 +502,52 @@ export function startIdle(engine) {
   wobble.start(t);
   parts.push(wobble);
 
-  running = { out, parts };
+  return {
+    stop() {
+      const now = ctx.currentTime;
+      out.gain.cancelScheduledValues(now);
+      out.gain.setValueAtTime(Math.max(out.gain.value, 0.0001), now);
+      out.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+      for (const node of parts) node.stop(now + 0.5);
+    }
+  };
+}
+
+// A recording if there is one, the synthesiser if there is not. Everything
+// outside this module goes through here rather than choosing for itself.
+export async function startIdle(model, engine) {
+  const ctx = ready();
+  if (!ctx) return false;
+  if (running) return true;
+
+  const recorded = await engineAudio.startIdle(model, engine, ctx, master);
+
+  // Muting while the file was still downloading.
+  if (muted) {
+    recorded?.stop();
+    return false;
+  }
+
+  running = recorded ?? synthIdle(ctx, engine);
   return true;
 }
 
 export function stopIdle() {
-  if (!running || !context) return;
-
-  const { out, parts } = running;
+  if (!running) return;
+  const current = running;
   running = null;
-
-  const t = context.currentTime;
-  out.gain.cancelScheduledValues(t);
-  out.gain.setValueAtTime(Math.max(out.gain.value, 0.0001), t);
-  out.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
-
-  for (const node of parts) node.stop(t + 0.5);
+  current.stop();
 }
 
 // Changing car, or fitting a different exhaust, while the engine is running.
-export function retuneIdle(engine) {
+export function retuneIdle(model, engine) {
   if (!running) return;
   stopIdle();
-  window.setTimeout(() => startIdle(engine), 120);
+  window.setTimeout(() => startIdle(model, engine), 120);
+}
+
+// What a car will actually sound like: the recording it found, or nothing,
+// meaning the synthesiser is doing the work.
+export function recordingFor(model, engine) {
+  return engineAudio.describe(model, engine);
 }

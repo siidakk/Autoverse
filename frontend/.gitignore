@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Engine recordings. Licences vary and the files are large, so they are fetched
+# by whoever runs this rather than committed. See public/sounds/README.md
+public/sounds/*.mp3
+public/sounds/*.ogg
+public/sounds/*.wav
