@@ -27,6 +27,7 @@ import { SCENES, sceneById } from "../data/scenes";
 import { loadBuild } from "../lib/api";
 import { noteViewed } from "../lib/recent";
 import * as sound from "../lib/sound";
+import { engineFor } from "../data/engines";
 
 function CarList({ selected, onSelect }) {
   return (
@@ -97,8 +98,9 @@ const FACTORY = {
   tintLevel: "clear"
 };
 
-// How much engine each exhaust implies, which is what the rev is built from.
-const EXHAUST_WEIGHT = { twin: 0.45, quad: 0.8, centre: 0.6, carbon: 0.9 };
+// What each exhaust does to the noise. The engine is whatever the car has;
+// the pipe only decides how much of it reaches you.
+const EXHAUST_LOUDNESS = { stock: 1, twin: 1.15, quad: 1.35, centre: 1.2, carbon: 1.45 };
 
 export default function Showroom() {
 
@@ -129,6 +131,10 @@ export default function Showroom() {
   const [stageId, setStageId] = useState("studio");
   const [comparing, setComparing] = useState(false);
 
+  // What this particular car has under the bonnet. Every noise it makes is
+  // built from these numbers rather than from a recording.
+  const engine = useMemo(() => engineFor(selectedCar.model), [selectedCar.model]);
+
   const stage = sceneById(stageId);
 
   const [quiet, setQuiet] = useState(() => sound.isMuted());
@@ -145,9 +151,9 @@ export default function Showroom() {
         return false;
       }
       // Refuses if sound is muted, in which case the switch should not move.
-      return sound.startIdle({ weight: 0.5 });
+      return sound.startIdle(engine);
     });
-  }, []);
+  }, [engine]);
 
   // Leaving the configurator has to stop the engine, or it follows you around
   // the rest of the site.
@@ -253,6 +259,10 @@ export default function Showroom() {
     setDecals([]);
     setDecalDesign(null);
     setComparing(false);
+
+    // A running engine becomes the new car's engine rather than carrying the
+    // old one's note across.
+    sound.retuneIdle(engineFor(car.model));
 
     // A build code in the address bar belongs to the car that was open, so it
     // goes with it rather than re-loading over the new choice.
@@ -476,6 +486,27 @@ export default function Showroom() {
             ))}
           </div>
 
+          {/* REV. The whole point of the engine data: press it and you hear
+              what this car actually has, not a generic noise. */}
+          <button
+            type="button"
+            onClick={() =>
+              sound.revEngine(engine, {
+                loudness: EXHAUST_LOUDNESS[exhaustType] ?? 1
+              })
+            }
+            disabled={quiet}
+            title={`${selectedCar.name} — ${engine.label}`}
+            className={[
+              "flex w-full items-center justify-between gap-3 px-3 py-2.5 transition-colors",
+              "disabled:cursor-not-allowed disabled:opacity-40",
+              "bg-signal text-ink hover:brightness-110 active:brightness-95"
+            ].join(" ")}
+          >
+            <span className="text-[11px] font-semibold tracking-widest uppercase">Rev</span>
+            <span className="readout text-[9px] opacity-70">{engine.label}</span>
+          </button>
+
           <button
             type="button"
             onClick={toggleEngine}
@@ -592,11 +623,8 @@ export default function Showroom() {
         setStance={withSound(setStance, sound.clunk)}
         exhaustType={exhaustType}
         setExhaustType={withSound(setExhaustType, (type) => {
-          const weight = EXHAUST_WEIGHT[type] ?? 0.4;
           if (type === "stock") sound.tick();
-          else sound.rev({ weight });
-          // A different exhaust on a running engine should change how it idles.
-          sound.retuneIdle(weight);
+          else sound.revEngine(engine, { loudness: EXHAUST_LOUDNESS[type] ?? 1 });
         })}
         headlightType={headlightType}
         setHeadlightType={withSound(setHeadlightType, sound.tick)}
@@ -613,7 +641,7 @@ export default function Showroom() {
         total={total}
         buildPayload={buildPayload}
         onSaved={(code) => {
-          sound.launch();
+          sound.launch(engine);
           setSearchParams({ build: code }, { replace: true });
         }}
         restoring={restoring}

@@ -146,31 +146,6 @@ function ClassicWheel({ radius, width, sidewall }) {
   );
 }
 
-// Swapping the wheels hides the ones the model came with, and on most cars that
-// leaves the arch as an open hole you can see straight through to the far side
-// of the car. A real car has a liner in there. This is that liner: a dark shell
-// behind the wheel, drawn inside out so it is only visible through the arch.
-function ArchLiner({ radius, width }) {
-  const shell = radius * 1.07;
-
-  return (
-    <>
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[shell, shell, width * 2.1, 24, 1, true]} />
-        {/* side 1 is BackSide: the inside of the shell, not the outside */}
-        <meshStandardMaterial color="#0a0b0d" roughness={1} metalness={0} side={1} />
-      </mesh>
-
-      {/* The inboard cap, which is what actually stops daylight coming
-          through from the other side of the car. */}
-      <mesh position={[0, 0, -width * 1.02]}>
-        <circleGeometry args={[shell, 24]} />
-        <meshStandardMaterial color="#0a0b0d" roughness={1} metalness={0} side={2} />
-      </mesh>
-    </>
-  );
-}
-
 export default function Wheels({
   type,
   wheels,
@@ -207,8 +182,6 @@ export default function Wheels({
 
         return (
         <group key={index} position={wheel.position} rotation={rotation}>
-
-          <ArchLiner radius={wheel.radius} width={wheel.thickness} />
 
           {type === "sport" ? (
             <SportWheel

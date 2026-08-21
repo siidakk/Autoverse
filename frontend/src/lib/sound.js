@@ -133,74 +133,237 @@ export function clunk() {
   hit.start();
 }
 
-// An engine blip. `weight` moves it from a small four cylinder towards
-// something with a lot more capacity, so a quad exhaust does not sound like a
-// hatchback and a carbon one has some bass to it.
-export function rev({ weight = 0.5, duration = 0.85, level = 0.22 } = {}) {
-  const ctx = ready();
-  if (!ctx) return;
+// --- engines ---
+//
+// Built from the car's own specification rather than from a recording. See
+// data/engines.js: the note an engine makes is its firing frequency, which is
+// rpm and cylinder count and nothing else. Everything below layers character
+// on top of that one number.
 
-  const t = ctx.currentTime;
-  const idle = 78 - weight * 30;
-  const peak = idle * 4.2;
+// How the revs actually move when you blip the throttle: up fast, hang for a
+// moment, fall back more slowly than they rose. A big heavy engine takes
+// longer to do all three.
+function rpmCurve(engine, samples = 96, hold = 0.18) {
+  const { idle, redline, capacity } = engine;
 
-  const filter = ctx.createBiquadFilter();
-  filter.type = "lowpass";
-  filter.Q.value = 6;
-  filter.frequency.setValueAtTime(360, t);
-  filter.frequency.exponentialRampToValueAtTime(3200, t + duration * 0.34);
-  filter.frequency.exponentialRampToValueAtTime(520, t + duration);
+  // Rotating mass. A 6.5 litre V12 will not pick up like a 1.3 rotary.
+  const inertia = Math.min(Math.max(capacity / 4, 0.28), 1.5);
+  const riseFor = 0.3 + inertia * 0.34;
+  const fallFor = 0.45 + inertia * 0.5;
+  const total = riseFor + hold + fallFor;
 
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.0001, t);
-  gain.gain.exponentialRampToValueAtTime(level, t + 0.06);
-  gain.gain.setValueAtTime(level, t + duration * 0.4);
-  gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+  const values = new Float32Array(samples);
 
-  filter.connect(gain).connect(master);
+  for (let i = 0; i < samples; i++) {
+    const t = (i / (samples - 1)) * total;
+    let rpm;
 
-  // Two saws an octave apart, slightly detuned. The detune is what makes it
-  // read as an engine rather than a synthesiser.
-  for (const [multiplier, detune] of [[1, 0], [0.5, -8], [2, 11]]) {
-    const osc = ctx.createOscillator();
-    osc.type = "sawtooth";
-    osc.detune.value = detune;
-    osc.frequency.setValueAtTime(idle * multiplier, t);
-    osc.frequency.exponentialRampToValueAtTime(peak * multiplier, t + duration * 0.34);
-    osc.frequency.exponentialRampToValueAtTime(idle * 1.35 * multiplier, t + duration);
-    osc.connect(filter);
-    osc.start(t);
-    osc.stop(t + duration + 0.05);
+    if (t < riseFor) {
+      // Fast at first and easing off as it meets the limiter.
+      const p = t / riseFor;
+      rpm = idle + (redline - idle) * (1 - Math.pow(1 - p, 2.1));
+    } else if (t < riseFor + hold) {
+      // Bouncing off the limiter rather than sitting flat on it.
+      rpm = redline + Math.sin((t - riseFor) * 90) * redline * 0.012;
+    } else {
+      const p = (t - riseFor - hold) / fallFor;
+      rpm = redline - (redline - idle) * Math.pow(p, 0.75);
+    }
+
+    values[i] = Math.max(rpm, 1);
   }
 
-  // Induction roar.
-  const air = noise(ctx, duration);
+  return { values, total };
+}
+
+// The harmonics an engine puts out, and how loud each is. This is where a
+// layout stops being a number and starts being a sound.
+function harmonicsFor(engine) {
+  const { layout, smooth } = engine;
+
+  if (layout === "rotary") {
+    // No reciprocating mass, so almost no low order content and a hard edge
+    // higher up: the sound a rotary is famous for.
+    return [[1, 0.5], [2, 0.62], [3, 0.34], [4, 0.26], [6, 0.14]];
+  }
+
+  const set = [[1, 1], [2, 0.55], [3, 0.3], [4, 0.18], [6, 0.08]];
+
+  if (layout === "cross") {
+    // A cross plane V8 fires unevenly across its two banks, and the half order
+    // that produces is the whole reason it burbles instead of shrieking.
+    set.unshift([0.5, 0.85]);
+    set.push([1.5, 0.4]);
+  }
+
+  if (layout === "flat") set.push([1.5, 0.22]);
+
+  // A balanced engine puts more of its energy up the harmonic series.
+  return set.map(([order, level]) => [
+    order,
+    order >= 3 ? level * (0.6 + smooth * 0.9) : level
+  ]);
+}
+
+function orderOf(engine) {
+  return engine.rotor ? 2 : engine.cylinders / 2;
+}
+
+// A blip of the throttle. `loudness` is what the exhaust does to it.
+export function revEngine(engine, { loudness = 1 } = {}) {
+  const ctx = ready();
+  if (!ctx) return 0;
+
+  const t = ctx.currentTime;
+  const { values, total } = rpmCurve(engine);
+  const order = orderOf(engine);
+
+  // rpm to hertz, once, then every oscillator is a multiple of it.
+  const fundamental = new Float32Array(values.length);
+  for (let i = 0; i < values.length; i++) fundamental[i] = (values[i] / 60) * order;
+
+  const out = ctx.createGain();
+  out.gain.setValueAtTime(0.0001, t);
+  out.gain.exponentialRampToValueAtTime(0.3 * loudness, t + 0.05);
+  out.gain.setValueAtTime(0.3 * loudness, t + total * 0.6);
+  out.gain.exponentialRampToValueAtTime(0.0001, t + total);
+  out.connect(master);
+
+  // The exhaust opening up as the revs rise.
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.Q.value = 1.4;
+
+  const cutoff = new Float32Array(values.length);
+  for (let i = 0; i < values.length; i++) {
+    cutoff[i] = Math.min(1100 + fundamental[i] * 14 * loudness, 16000);
+  }
+  filter.frequency.setValueCurveAtTime(cutoff, t, total);
+  filter.connect(out);
+
+  for (const [multiple, level] of harmonicsFor(engine)) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = multiple < 1 ? "triangle" : "sawtooth";
+    // A few cents apart, which stops the harmonics phase locking into
+    // something that sounds like an organ rather than an engine.
+    osc.detune.value = (multiple * 37) % 11;
+
+    const track = new Float32Array(values.length);
+    for (let i = 0; i < values.length; i++) {
+      track[i] = Math.min(Math.max(fundamental[i] * multiple, 20), 18000);
+    }
+
+    osc.frequency.setValueCurveAtTime(track, t, total);
+    gain.gain.value = level * 0.22;
+
+    osc.connect(gain).connect(filter);
+    osc.start(t);
+    osc.stop(t + total + 0.05);
+  }
+
+  // Induction, which rises with the revs on anything.
+  const air = noise(ctx, total);
   const airBand = ctx.createBiquadFilter();
   const airGain = ctx.createGain();
 
   airBand.type = "bandpass";
-  airBand.frequency.setValueAtTime(700, t);
-  airBand.frequency.exponentialRampToValueAtTime(2600, t + duration * 0.34);
-  airBand.frequency.exponentialRampToValueAtTime(900, t + duration);
-  airBand.Q.value = 1.1;
+  airBand.Q.value = 0.9;
 
-  airGain.gain.setValueAtTime(0.0001, t);
-  airGain.gain.exponentialRampToValueAtTime(level * 0.5, t + 0.08);
-  airGain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+  const airTrack = new Float32Array(values.length);
+  for (let i = 0; i < values.length; i++) airTrack[i] = 500 + fundamental[i] * 6;
+  airBand.frequency.setValueCurveAtTime(airTrack, t, total);
+  airGain.gain.value = 0.05 * loudness;
 
-  air.connect(airBand).connect(airGain).connect(master);
+  air.connect(airBand).connect(airGain).connect(out);
   air.start(t);
+
+  // Compression ignition is audibly noisy, and the rate of that noise is the
+  // firing frequency itself, so the clatter keeps time with the engine.
+  if (engine.clatter > 0) {
+    const knock = noise(ctx, total);
+    const knockBand = ctx.createBiquadFilter();
+    const knockGain = ctx.createGain();
+    const pulse = ctx.createOscillator();
+    const pulseDepth = ctx.createGain();
+
+    knockBand.type = "bandpass";
+    knockBand.frequency.value = 1800;
+    knockBand.Q.value = 1.2;
+
+    knockGain.gain.value = 0.02 * engine.clatter;
+
+    pulse.type = "square";
+    pulse.frequency.setValueCurveAtTime(fundamental, t, total);
+    pulseDepth.gain.value = 0.05 * engine.clatter;
+    pulse.connect(pulseDepth).connect(knockGain.gain);
+    pulse.start(t);
+    pulse.stop(t + total);
+
+    knock.connect(knockBand).connect(knockGain).connect(out);
+    knock.start(t);
+  }
+
+  // Forced induction. A turbo spools behind the revs and lets go on lift; a
+  // supercharger is belt driven, so its whine tracks rpm exactly.
+  if (engine.aspiration === "turbo" || engine.aspiration === "supercharged") {
+    const belt = engine.aspiration === "supercharged";
+    const whistle = ctx.createOscillator();
+    const whistleGain = ctx.createGain();
+
+    whistle.type = belt ? "sawtooth" : "sine";
+
+    const track = new Float32Array(values.length);
+    const level = new Float32Array(values.length);
+
+    for (let i = 0; i < values.length; i++) {
+      const spun = (values[i] - engine.idle) / (engine.redline - engine.idle);
+      track[i] = Math.min(1400 + spun * (belt ? 5200 : 7200), 17000);
+      // A turbo needs revs behind it before it makes any noise at all.
+      level[i] = Math.max(belt ? spun * 0.05 : Math.pow(spun, 1.9) * 0.055, 0.0001);
+    }
+
+    whistle.frequency.setValueCurveAtTime(track, t, total);
+    whistleGain.gain.setValueCurveAtTime(level, t, total);
+
+    whistle.connect(whistleGain).connect(out);
+    whistle.start(t);
+    whistle.stop(t + total);
+
+    if (!belt) {
+      // The release when the throttle shuts.
+      const off = t + total * 0.55;
+      const pshh = noise(ctx, 0.3);
+      const band = ctx.createBiquadFilter();
+      const gain = ctx.createGain();
+
+      band.type = "bandpass";
+      band.frequency.setValueAtTime(3800, off);
+      band.frequency.exponentialRampToValueAtTime(1300, off + 0.28);
+      band.Q.value = 0.7;
+
+      gain.gain.setValueAtTime(0.0001, off);
+      gain.gain.exponentialRampToValueAtTime(0.05, off + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, off + 0.3);
+
+      pshh.connect(band).connect(gain).connect(master);
+      pshh.start(off);
+    }
+  }
+
+  return total;
 }
 
 // Saving a build. The one moment worth a proper send off.
-export function launch() {
+export function launch(engine) {
   const ctx = ready();
   if (!ctx) return;
 
-  rev({ weight: 0.85, duration: 1.5, level: 0.26 });
+  const total = revEngine(engine, { loudness: 1.15 }) || 1;
 
   // A second blip on the way out, so it lifts rather than just stopping.
-  window.setTimeout(() => rev({ weight: 0.7, duration: 0.9, level: 0.15 }), 620);
+  window.setTimeout(() => revEngine(engine, { loudness: 0.8 }), total * 620);
 }
 
 // Changing the room, or moving the camera to a preset.
@@ -258,65 +421,89 @@ export function neon() {
 // a slow wobble on top: a real engine at rest is never quite steady, and a
 // perfectly constant tone reads as a fridge rather than a car.
 
-let engine = null;
+let running = null;
 
 export function idling() {
-  return Boolean(engine);
+  return Boolean(running);
 }
 
-export function startIdle({ weight = 0.5 } = {}) {
+export function startIdle(engine) {
   const ctx = ready();
   if (!ctx) return false;
-  if (engine) return true;
+  if (running) return true;
 
   const t = ctx.currentTime;
-  const base = 48 - weight * 14;
+  const base = (engine.idle / 60) * orderOf(engine);
 
   const out = ctx.createGain();
   out.gain.setValueAtTime(0.0001, t);
-  out.gain.exponentialRampToValueAtTime(0.05, t + 0.7);
+  out.gain.exponentialRampToValueAtTime(0.07, t + 0.7);
   out.connect(master);
 
   const filter = ctx.createBiquadFilter();
   filter.type = "lowpass";
-  filter.frequency.value = 260 + weight * 140;
-  filter.Q.value = 3;
+  filter.frequency.value = 240 + base * 3.2;
+  filter.Q.value = 2.5;
   filter.connect(out);
 
   const parts = [];
 
-  // The firing orders, roughly: the fundamental plus the two harmonics that
-  // carry most of what an idle actually sounds like.
-  for (const [multiplier, detune] of [[1, 0], [2, 6], [3, -9]]) {
+  // The same harmonic recipe as the rev, held at idle speed. A V12 ticking
+  // over at 850 sits at 85 Hz; a diesel four at 700 sits at 23 Hz, and you can
+  // hear which is which without being told.
+  for (const [multiple, level] of harmonicsFor(engine)) {
     const osc = ctx.createOscillator();
-    osc.type = "sawtooth";
-    osc.frequency.value = base * multiplier;
-    osc.detune.value = detune;
-    osc.connect(filter);
+    const gain = ctx.createGain();
+
+    osc.type = multiple < 1 ? "triangle" : "sawtooth";
+    osc.frequency.value = base * multiple;
+    osc.detune.value = (multiple * 41) % 13;
+    gain.gain.value = level * 0.16;
+
+    osc.connect(gain).connect(filter);
     osc.start(t);
     parts.push(osc);
   }
 
-  // The lump. Slow, shallow, and enough to stop it sounding synthetic.
+  // Diesel clatter, gated at the firing rate.
+  if (engine.clatter > 0) {
+    const knock = ctx.createOscillator();
+    const knockGain = ctx.createGain();
+
+    knock.type = "square";
+    knock.frequency.value = base;
+    knockGain.gain.value = 0.02 * engine.clatter;
+
+    knock.connect(knockGain).connect(filter);
+    knock.start(t);
+    parts.push(knock);
+  }
+
+  // The lump. Slow, shallow, and enough to stop it sounding synthetic: a real
+  // engine at rest is never quite steady, and a constant tone reads as a
+  // fridge rather than a car.
   const wobble = ctx.createOscillator();
   const wobbleDepth = ctx.createGain();
+
   wobble.type = "sine";
-  wobble.frequency.value = 5.5;
-  wobbleDepth.gain.value = base * 0.05;
+  wobble.frequency.value = 4.5 + (1 - engine.smooth) * 4;
+  wobbleDepth.gain.value = base * 0.045;
   wobble.connect(wobbleDepth);
-  for (const osc of parts) wobbleDepth.connect(osc.frequency);
+  for (const node of parts) {
+    if (node.frequency) wobbleDepth.connect(node.frequency);
+  }
   wobble.start(t);
   parts.push(wobble);
 
-  engine = { out, parts };
+  running = { out, parts };
   return true;
 }
 
 export function stopIdle() {
-  if (!engine || !context) return;
+  if (!running || !context) return;
 
-  const { out, parts } = engine;
-  engine = null;
+  const { out, parts } = running;
+  running = null;
 
   const t = context.currentTime;
   out.gain.cancelScheduledValues(t);
@@ -326,9 +513,9 @@ export function stopIdle() {
   for (const node of parts) node.stop(t + 0.5);
 }
 
-// Fitting a different exhaust while the engine is running should be audible.
-export function retuneIdle(weight) {
-  if (!engine) return;
+// Changing car, or fitting a different exhaust, while the engine is running.
+export function retuneIdle(engine) {
+  if (!running) return;
   stopIdle();
-  window.setTimeout(() => startIdle({ weight }), 120);
+  window.setTimeout(() => startIdle(engine), 120);
 }
