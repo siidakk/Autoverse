@@ -21,27 +21,70 @@ app.get("/health", (req, res) => {
 
   const hosted = process.env.NODE_ENV === "production"
 
+  // "Not configured" and "configured but unreachable" are different problems
+  // with different fixes, so they are reported as different things.
+  let note
+  if (database === "connected") {
+    note = "Accounts and saved builds are working."
+  } else if (!mongoUri) {
+    note = hosted
+      ? "MONGO_URI is not set on this service. Add it in the environment settings."
+      : "No MONGO_URI in backend/.env. Start a local one with: cd backend && npm run db:local"
+  } else if (database === "connecting") {
+    note = `Still trying to reach the database, attempt ${attempts}.`
+  } else {
+    note = hosted
+      // Telling a hosted service to run a database on a laptop helps nobody.
+      ? "MONGO_URI is set but the database cannot be reached. Check the cluster is not paused and that Network Access allows 0.0.0.0/0."
+      : "MONGO_URI is set but the database cannot be reached. Start a local one with: cd backend && npm run db:local"
+  }
+
   res.status(200).json({
     status: "ok",
     database,
     accountsWork: database === "connected",
-    note: database === "connected"
-      ? "Accounts and saved builds are working."
-      : hosted
-        // Telling a hosted service to run a database on a laptop helps nobody.
-        ? "The API is running but MONGO_URI does not point at a reachable database. Set it in the service's environment to an Atlas connection string."
-        : "The API is running but has no database, so accounts and saving are off. Start one with: cd backend && npm run db:local"
+    mongoConfigured: Boolean(mongoUri),
+    attempts,
+    lastError,
+    note
   })
 })
 
+// A single attempt at boot is not enough. Mongoose does not retry after the
+// first connection fails, so a service that started while the cluster happened
+// to be paused stays dead until a human restarts it -- which is exactly what
+// happened here. Keep trying, and the API heals itself the moment the database
+// comes back.
+let attempts = 0
+let lastError = null
+
+// Never let a connection string reach a response body or a log line.
+const scrub = (text) => String(text).replace(/\/\/[^@\s]*@/g, "//***:***@")
+
+const connect = async () => {
+  attempts += 1
+  try {
+    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 8000 })
+    lastError = null
+    console.log("MongoDB Connected")
+  } catch (err) {
+    lastError = scrub(err.message)
+    // Back off to a minute so a long outage does not mean thousands of tries,
+    // but stay quick early on so a restart is not needed after a brief blip.
+    const wait = Math.min(60000, 2000 * 2 ** Math.min(attempts - 1, 5))
+    console.error(`MongoDB connection failed (attempt ${attempts}): ${lastError}`)
+    console.error(`Retrying in ${Math.round(wait / 1000)}s`)
+    setTimeout(connect, wait).unref?.()
+  }
+}
+
 if (mongoUri) {
-  mongoose.connect(mongoUri)
-    .then(() => {
-      console.log("MongoDB Connected")
-    })
-    .catch((err) => {
-      console.error("MongoDB connection failed", err)
-    })
+  connect()
+  // Losing the connection later is handled by the driver, but if it gives up
+  // entirely we want to be trying again rather than waiting to be noticed.
+  mongoose.connection.on("disconnected", () => {
+    if (mongoose.connection.readyState === 0) setTimeout(connect, 5000).unref?.()
+  })
 } else {
   console.warn("MONGO_URI is not configured; continuing without MongoDB")
 }
