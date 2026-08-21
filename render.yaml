@@ -16,12 +16,19 @@ services:
     runtime: node
     plan: free
     rootDir: backend
-    buildCommand: npm ci
+    buildCommand: npm ci --omit=dev
     startCommand: npm start
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
+      # Signs session tokens. Generated once by Render rather than committed,
+      # and the API refuses to boot in production without it.
+      - key: JWT_SECRET
+        generateValue: true
+      # Set this to an Atlas connection string to turn on accounts and saving.
+      - key: MONGO_URI
+        sync: false
       - key: ML_API_HOSTPORT
         fromService:
           type: web

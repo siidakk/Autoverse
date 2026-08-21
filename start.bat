@@ -36,6 +36,9 @@ if not exist "ml\recommender.pkl" (
 
 rem ---- the three services ----
 
+echo   Starting the database on port 27019...
+start "AutoVerse - Database" cmd /k "cd /d %~dp0backend && node tools/localMongo.mjs"
+
 echo   Starting the recommendation service on port 8000...
 start "AutoVerse - ML" cmd /k "cd /d %~dp0ml && python app.py"
 
@@ -47,14 +50,17 @@ start "AutoVerse - Web" cmd /k "cd /d %~dp0frontend && npm run dev"
 
 echo.
 echo   Waiting for everything to come up...
-timeout /t 9 /nobreak >nul
+timeout /t 12 /nobreak >nul
 
 start "" http://localhost:5173
 
 echo.
 echo   Open at http://localhost:5173
 echo.
-echo   Three windows have opened, one per service. Closing any of them stops
-echo   that part of the site. Close all three to shut everything down.
+echo   Four windows have opened, one per service. Closing any of them stops
+echo   that part of the site. Close them all to shut everything down.
+echo.
+echo   Accounts and saved builds go into backend\.data, so they survive a
+echo   restart. Nothing leaves this machine.
 echo.
 pause

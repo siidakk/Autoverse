@@ -24,3 +24,6 @@ Thumbs.db
 
 # Uncompressed model backups kept locally, not in the repo
 *.orig.glb
+
+# Local database files
+backend/.data/
