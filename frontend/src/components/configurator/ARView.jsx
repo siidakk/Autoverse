@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { arAvailable, unavailableBecause, startAR, isDeviceLimitation } from "../../lib/ar";
+import { isApple, quickLookSupported, openQuickLook } from "../../lib/arQuickLook";
 
 // The button that puts the car on your driveway, and the controls that stay
 // reachable while it is there.
@@ -15,8 +16,18 @@ const SIZES = [
   { factor: 0.06, label: "Desk", note: "a model on a table" }
 ];
 
-export default function ARView({ car, colour }) {
-  const [can, setCan] = useState(null);
+// Two platforms, two entirely different mechanisms, one button.
+//
+//   Android   WebXR: this page renders the camera feed and places the car
+//   iOS       AR Quick Look: the system viewer takes over, given a USDZ file
+//
+// Both are handed the same clone of the configured car, so what you see is the
+// same on either. Safari has no WebXR and is not getting it, so there was
+// never a single path that covered both.
+export default function ARView({ car, stageRef }) {
+  // Read once at mount on Apple hardware, where the answer is a property of
+  // the browser rather than something to go and ask for.
+  const [can, setCan] = useState(() => (isApple() ? quickLookSupported() : null));
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState(null);
   const [error, setError] = useState(null);
@@ -41,15 +52,23 @@ export default function ARView({ car, colour }) {
     }).then(setQr, () => setQr(null));
   }, [handoff]);
 
+  const apple = isApple();
+
   useEffect(() => {
+    // On Apple hardware the question is whether Quick Look will take the link,
+    // not whether WebXR exists -- it never does. That was settled above.
+    if (apple) return;
+
     let cancelled = false;
+
     arAvailable().then((ok) => {
       if (!cancelled) setCan(ok);
     });
+
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [apple]);
 
   // A session left running after the panel closes keeps the camera on.
   useEffect(() => () => handle.current?.end?.(), []);
@@ -59,9 +78,19 @@ export default function ARView({ car, colour }) {
     setStatus("Starting");
 
     try {
+      if (apple) {
+        // Hands the file to the system and stops. There is no way to be told
+        // what the viewer does after that, which is the trade for not having
+        // to build one.
+        await openQuickLook(stageRef.current, {
+          onStatus: setStatus,
+          name: car.name.replace(/[^a-z0-9]+/gi, "-")
+        });
+        return;
+      }
+
       const session = await startAR({
-        model: car.model,
-        colour,
+        stage: stageRef.current,
         overlay: overlay.current,
         onStatus: setStatus
       });
@@ -145,8 +174,9 @@ export default function ARView({ car, colour }) {
 
       {can === true && !running && !error && (
         <p className="text-xs leading-relaxed text-fog">
-          Opens the camera, finds the ground, and stands this exact build on it
-          at its real size. Everything you have fitted comes with it.
+          {apple
+            ? "Exports this exact build and opens it in the iOS AR viewer, at its real size. The paint, wheels, stance and everything else you have fitted come with it."
+            : "Opens the camera, finds the ground, and stands this exact build on it at its real size. The paint, wheels, stance and everything else you have fitted come with it."}
         </p>
       )}
 

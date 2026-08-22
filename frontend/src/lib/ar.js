@@ -15,14 +15,8 @@
 // keep their factory colour.
 
 import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
-import { inspectCar, detectLights } from "../utils/carGeometry";
-import { looksLikeTrim } from "../utils/lightDetection";
-
-// Real cars are about this long, and the configurator normalises every model
-// to it, so a life size placement means something.
-const TARGET_LENGTH = 4.6;
+import { snapshot, release } from "./arScene";
+import { isApple } from "./arQuickLook";
 
 export async function arAvailable() {
   if (typeof navigator === "undefined" || !navigator.xr) return false;
@@ -38,58 +32,24 @@ export async function arAvailable() {
 export function unavailableBecause() {
   if (typeof navigator === "undefined") return "Not running in a browser";
 
-  if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-    return "Safari has no WebXR, so in-room AR cannot run on iPhone or iPad. It works on Android in Chrome.";
+  // iOS is handled by Quick Look rather than here, so reaching this on an
+  // Apple device means Quick Look was unavailable too.
+  if (isApple()) {
+    return "AR on iPhone and iPad runs through Safari. Open this page in Safari and the button will work.";
   }
 
   // A laptop is the common case, and "no support" is a useless thing to tell
   // someone sitting at one. What they need to know is that this is a phone
   // feature and how to get it onto theirs.
-  return "AR needs a phone or tablet that can track the room. Open this same build on an Android phone in Chrome and the button will work there.";
+  return "AR needs a phone or tablet that can track the room. Open this same build on a phone and the button will work there.";
 }
 
 // Whether the reason is "wrong device" rather than "broken", which decides
 // whether offering a way onto a phone makes any sense.
 export function isDeviceLimitation() {
   if (typeof navigator === "undefined") return false;
+  if (isApple()) return false;
   return !/Android/i.test(navigator.userAgent) || !navigator.xr;
-}
-
-function paint(scene, colour) {
-  const measured = inspectCar(scene);
-  if (!measured) return;
-
-  const lights = detectLights(measured);
-  const wheels = new Set();
-
-  scene.traverse((child) => {
-    if (!child.isMesh || !child.material) return;
-
-    // Cloned so painting the AR copy cannot bleed back into the configurator,
-    // which shares the same cached glTF.
-    child.material = child.material.clone();
-
-    const material = child.material;
-    const name = `${child.name} ${material.name ?? ""}`;
-
-    if (/glass|window|windscreen|windshield|glazing/i.test(name)) return;
-    if (lights.meshes.has(child)) return;
-    if (looksLikeTrim(child.name) || looksLikeTrim(material.name)) return;
-    if (wheels.has(child)) return;
-
-    material.color = new THREE.Color(colour);
-    material.needsUpdate = true;
-  });
-}
-
-function fit(scene) {
-  const measured = inspectCar(scene);
-  if (!measured) return { scale: 1, lift: 0 };
-
-  return {
-    scale: TARGET_LENGTH / measured.length,
-    lift: -measured.box.min.y
-  };
 }
 
 /**
@@ -98,26 +58,19 @@ function fit(scene) {
  * `overlay` is a DOM element shown over the camera feed during the session,
  * which is how the exit button and the size control stay reachable.
  */
-export async function startAR({ model, colour = "#d8dce1", overlay, onStatus }) {
+export async function startAR({ stage, overlay, onStatus }) {
   const supported = await arAvailable();
   if (!supported) throw new Error(unavailableBecause());
 
-  onStatus?.("Loading the car");
+  onStatus?.("Preparing the car");
 
-  const loader = new GLTFLoader();
-  loader.setMeshoptDecoder(MeshoptDecoder);
+  // Taken from what the configurator has assembled, so the wheels, spoiler,
+  // exhaust and ride height come too. Reloading the file instead is how the
+  // first version of this ended up showing a stock car.
+  const car = snapshot(stage);
+  if (!car) throw new Error("The car is still loading.");
 
-  const gltf = await loader.loadAsync(model);
-  const car = gltf.scene;
-
-  paint(car, colour);
-  const { scale, lift } = fit(car);
-
-  // The car hangs inside a group so placement moves the group and scale is
-  // applied to the car, which keeps the two from fighting each other.
   const holder = new THREE.Group();
-  car.position.y = lift * scale;
-  car.scale.setScalar(scale);
   holder.add(car);
   holder.visible = false;
 
@@ -197,8 +150,7 @@ export async function startAR({ model, colour = "#d8dce1", overlay, onStatus }) 
   // about three.js.
   const handle = {
     setScale(factor) {
-      car.scale.setScalar(scale * factor);
-      car.position.y = lift * scale * factor;
+      car.scale.setScalar(factor);
     },
     reposition() {
       placed = false;
@@ -215,11 +167,9 @@ export async function startAR({ model, colour = "#d8dce1", overlay, onStatus }) 
       renderer.domElement.remove();
       renderer.dispose();
 
-      // Materials were cloned per mesh above, so they are this session's to
-      // free. The geometry belongs to the cached glTF and is left alone.
-      car.traverse((child) => {
-        if (child.isMesh) child.material?.dispose?.();
-      });
+      // The snapshot cloned its materials, so they are this session's to free.
+      // Geometry belongs to the live scene and is left alone.
+      release(car);
 
       resolve();
     });

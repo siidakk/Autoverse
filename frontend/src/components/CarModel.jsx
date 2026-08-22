@@ -29,7 +29,11 @@ export default function CarModel({
   underglow = null,
   wrap = { mode: "none", colour: "#111111" },
   tint = { colour: "#dfe6ee", opacity: 0.35 },
-  onPlaceDecal = null
+  onPlaceDecal = null,
+  // Handed the finished group -- body, wheels, spoiler, exhaust, the lot -- so
+  // AR can take what is actually on screen rather than reloading the bare file
+  // and quietly leaving every fitted part behind.
+  stageRef = null
 }) {
 
   const { scene } = useGLTF(car.model);
@@ -290,7 +294,7 @@ export default function CarModel({
   };
 
   return (
-    <group scale={fit.scale} position={fit.position}>
+    <group ref={stageRef} scale={fit.scale} position={fit.position}>
 
       {/* The body moves, the wheels stay on the road */}
       <group

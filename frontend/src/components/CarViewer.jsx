@@ -182,7 +182,8 @@ export default function CarViewer({
   decals,
   onPlaceDecal,
   view,
-  stage
+  stage,
+  stageRef
 }) {
   const controls = useRef(null);
 
@@ -243,6 +244,7 @@ export default function CarViewer({
           wrap={wrap}
           tint={tint}
           onPlaceDecal={onPlaceDecal}
+          stageRef={stageRef}
         />
 
         <DecalLayer

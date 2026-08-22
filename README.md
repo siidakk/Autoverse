@@ -120,6 +120,7 @@ cd frontend
 npm run test:placement   # accessory maths over all 18 models
 npm run test:lights      # lamp detection does not swallow bodywork
 npm run test:engines     # cylinder count orders the engine notes
+npm run test:ar          # the AR snapshot and its USDZ export
 npm run validate:models  # a model's wheels are findable before it ships
 
 cd backend
@@ -155,7 +156,11 @@ placement bug gets caught over eighteen models instead of one screenshot.
 
 ## Honest limitations
 
-- **AR does not work on iPhone or iPad.** Safari has no WebXR.
+- **AR takes a different route on each platform.** Android uses WebXR, where
+  the page renders the camera feed itself. iOS has no WebXR and never will, so
+  it exports the car to USDZ in the browser and hands it to Apple's own AR
+  viewer. Both are given the same clone of the configured car, so they show the
+  same thing — but only one of them is code you can step through.
 - **Voice recognition leaves the device.** Chrome does it on Google's servers.
   Everything else here does not, and the panel says which is which.
 - **Damage is a classifier, not a detector.** It is slid across the photo, so

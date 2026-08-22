@@ -247,6 +247,7 @@ export default function ControlPanel({
   room,
   startRoom,
   leaveRoom,
+  stageRef,
   restoring,
   comparing,
   setComparing,
@@ -482,7 +483,7 @@ export default function ControlPanel({
           <div className="space-y-7">
             <div>
               <p className="label mb-3">See it where it would stand</p>
-              <ARView car={car} colour={color} />
+              <ARView car={car} stageRef={stageRef} />
             </div>
 
             <div>

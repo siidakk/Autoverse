@@ -12,7 +12,8 @@
     "test:placement": "node tools/test-placement.mjs public/models",
     "compress:models": "node tools/compress-models.mjs public/models --replace",
     "test:lights": "node tools/test-lights.mjs public/models",
-    "test:engines": "node tools/test-engines.mjs"
+    "test:engines": "node tools/test-engines.mjs",
+    "test:ar": "node tools/test-ar.mjs"
   },
   "dependencies": {
     "@pmndrs/assets": "^1.7.0",

@@ -410,6 +410,10 @@ export default function Showroom() {
   // invitation. A change arriving from the room is applied without being sent
   // back out; without that guard two browsers spend the afternoon telling each
   // other the same thing.
+  // The assembled car, so AR can take what is on screen rather than
+  // reloading the bare model file.
+  const stageRef = useRef(null);
+
   const room = searchParams.get("room");
   const fromRemote = useRef(false);
 
@@ -545,6 +549,7 @@ export default function Showroom() {
           onPlaceDecal={decalDesign ? placeDecal : null}
           view={view}
           stage={stage}
+          stageRef={stageRef}
         />
 
         <ViewportLoader car={selectedCar} />
@@ -731,6 +736,7 @@ export default function Showroom() {
         room={room}
         startRoom={startRoom}
         leaveRoom={leaveRoom}
+        stageRef={stageRef}
         onSaved={(code) => {
           sound.launch(selectedCar.model, engine);
           setSearchParams({ build: code }, { replace: true });
