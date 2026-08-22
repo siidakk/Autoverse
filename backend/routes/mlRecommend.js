@@ -1,44 +1,19 @@
 const express = require("express")
 
-const axios = require("axios")
+const { proxy } = require("../mlService")
 
 const router = express.Router()
-const mlApiUrl = (
-  process.env.ML_API_URL ||
-  (process.env.ML_API_HOSTPORT && `http://${process.env.ML_API_HOSTPORT}`) ||
-  "http://127.0.0.1:8000"
-).replace(/\/$/, "")
 
-router.post("/", async (req, res) => {
-
-  try {
-
-    const response = await axios.post(
-
-      `${mlApiUrl}/recommend`,
-
-      req.body,
-
-      { timeout: 15000 }
-
-    )
-
-    res.json(response.data)
-
-  }
-
-  catch (error) {
-
-    console.error("ML API request failed", error.message)
-
-    res.status(502).json({
-
-      message: "Recommendation service is unavailable"
-
-    })
-
-  }
-
-})
+// The recommender. Everything about reaching the ML service -- how long to wait
+// for an instance that has been asleep, and how to say so -- lives in
+// mlService.js, because this route and the valuation had the same fifteen
+// second timeout against a service that takes fifty to wake.
+router.post("/", (req, res) =>
+  proxy(res, {
+    path: "/recommend",
+    body: req.body,
+    what: "The recommendation service"
+  })
+)
 
 module.exports = router

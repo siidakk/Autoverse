@@ -79,6 +79,14 @@ export async function loadBuild(code) {
 }
 
 export function describeError(error) {
+  const data = error.response?.data;
+
+  // A failure that will fix itself on its own says so, and its own wording is
+  // more specific than anything that can be inferred from a status code. This
+  // has to come first: a 503 used to be reported as the database being
+  // disconnected even when it was the ML service coming back from idle.
+  if (data?.waking) return data.message || data.error;
+
   if (error.response?.status === 503) {
     return "Saving is off right now — the database is not connected.";
   }
@@ -88,5 +96,5 @@ export function describeError(error) {
   if (error.code === "ECONNABORTED") {
     return "That took too long. The API sleeps when idle, so try again.";
   }
-  return error.response?.data?.error || "Could not reach the API.";
+  return data?.error || data?.message || "Could not reach the API.";
 }
