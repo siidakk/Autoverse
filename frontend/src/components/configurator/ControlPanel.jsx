@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { paintFamilies, finishes } from "../../data/paint";
 import SaveBuild from "./SaveBuild";
+import ARView from "./ARView";
+import LiveRoom from "./LiveRoom";
 import CompareToggle from "./CompareToggle";
 import DesignAssistant from "./DesignAssistant";
 import {
@@ -236,6 +238,10 @@ export default function ControlPanel({
   total,
   buildPayload,
   onSaved,
+  live,
+  room,
+  startRoom,
+  leaveRoom,
   restoring,
   comparing,
   setComparing,
@@ -611,6 +617,14 @@ export default function ControlPanel({
 
         <div className="mt-3">
           <SaveBuild buildPayload={buildPayload} onSaved={onSaved} />
+        </div>
+
+        <div className="mt-3">
+          <ARView car={car} colour={color} />
+        </div>
+
+        <div className="mt-3">
+          <LiveRoom live={live} room={room} onStart={startRoom} onLeave={leaveRoom} />
         </div>
 
         <Link to="/discover" className="btn btn-ghost mt-3 w-full">

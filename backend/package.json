@@ -9,7 +9,8 @@
     "db:local": "node tools/localMongo.mjs",
     "test:auth": "node tools/testAuth.mjs",
     "test:builds": "node tools/testBuilds.mjs",
-    "render:env": "node tools/renderEnv.mjs"
+    "render:env": "node tools/renderEnv.mjs",
+    "test:live": "node tools/testLive.mjs"
   },
   "keywords": [],
   "author": "",
@@ -23,7 +24,8 @@
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.6.2",
-    "nodemon": "^3.1.14"
+    "nodemon": "^3.1.14",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "mongodb-memory-server": "^11.2.0"

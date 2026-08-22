@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { cars, bodyStyles } from "../data/cars";
 import { finishes } from "../data/paint";
@@ -28,6 +28,7 @@ import { loadBuild } from "../lib/api";
 import { noteViewed } from "../lib/recent";
 import * as sound from "../lib/sound";
 import { engineFor } from "../data/engines";
+import { useLiveRoom, newRoomCode } from "../lib/live";
 
 function CarList({ selected, onSelect }) {
   return (
@@ -403,6 +404,85 @@ export default function Showroom() {
     if (spec.stage) setStageId(spec.stage);
   }, [applyFinish]);
 
+  // --- building it with someone else ---
+  //
+  // The room code lives in the address bar, so sharing the link is the whole
+  // invitation. A change arriving from the room is applied without being sent
+  // back out; without that guard two browsers spend the afternoon telling each
+  // other the same thing.
+  const room = searchParams.get("room");
+  const fromRemote = useRef(false);
+
+  const applyRemote = useCallback(
+    (spec) => {
+      fromRemote.current = true;
+
+      if (spec.carId && spec.carId !== selectedCar.id) {
+        const car = cars.find((entry) => entry.id === spec.carId);
+        // Set directly rather than through selectCar, which resets everything
+        // to factory -- exactly what the incoming spec is about to overwrite.
+        if (car) setSelectedCar(car);
+      }
+
+      applyTheme(spec);
+    },
+    [applyTheme, selectedCar.id]
+  );
+
+  const live = useLiveRoom(room, applyRemote);
+  const { send: sendSpec } = live;
+
+  // Every setting that makes up the car, in one object, so the effect below
+  // has a single thing to watch.
+  const sharedSpec = useMemo(
+    () => ({
+      carId: selectedCar.id,
+      color,
+      finish,
+      wheelType,
+      wheelSize,
+      caliper,
+      stance,
+      spoilerType,
+      exhaustType,
+      headlightType,
+      underglow,
+      wrapMode,
+      wrapColour,
+      tintLevel
+    }),
+    [
+      selectedCar.id, color, finish, wheelType, wheelSize, caliper, stance,
+      spoilerType, exhaustType, headlightType, underglow, wrapMode, wrapColour,
+      tintLevel
+    ]
+  );
+
+  useEffect(() => {
+    if (!room) return;
+
+    // The change that just arrived was theirs. Applying it must not bounce it
+    // back, so one broadcast is skipped and the flag cleared.
+    if (fromRemote.current) {
+      fromRemote.current = false;
+      return;
+    }
+
+    sendSpec(sharedSpec);
+  }, [room, sendSpec, sharedSpec]);
+
+  const startRoom = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.set("room", newRoomCode());
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const leaveRoom = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("room");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const buildPayload = useCallback(
     () => ({
       carId: selectedCar.id,
@@ -644,6 +724,10 @@ export default function Showroom() {
         setTintLevel={withSound(setTintLevel, sound.tick)}
         total={total}
         buildPayload={buildPayload}
+        live={live}
+        room={room}
+        startRoom={startRoom}
+        leaveRoom={leaveRoom}
         onSaved={(code) => {
           sound.launch(selectedCar.model, engine);
           setSearchParams({ build: code }, { replace: true });

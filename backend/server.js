@@ -91,8 +91,17 @@ if (mongoUri) {
 
 const PORT = process.env.PORT || 5000
 
-app.listen(PORT, "0.0.0.0", () => {
+const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`)
+})
+
+// Building the same car with someone else. Shares the HTTP server rather than
+// opening a second port, because a hosted service is only given one.
+const { attachLive } = require("./live")
+const live = attachLive(server)
+
+app.get("/live/rooms", (req, res) => {
+  res.json({ rooms: live.rooms() })
 })
 
 const mlRoute =
