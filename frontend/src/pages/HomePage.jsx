@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, useInView } from "framer-motion";
 import { useProgress, useGLTF } from "@react-three/drei";
 import HeroScene from "../components/home/HeroScene";
 import { HERO_SEQUENCE } from "../components/home/heroSequence";
-import { cars } from "../data/cars";
-import { finishes, totalShades } from "../data/paint";
+import { SECTIONS } from "../data/navigation";
 
 const DISPLAY_MS = 5600;
 const FADE_MS = 700;
@@ -59,62 +58,57 @@ function useCarCarousel(length) {
   return { index, showing, goTo, still };
 }
 
-const capabilities = [
-  {
-    index: "01",
-    title: "3D Configurator",
-    status: "live",
-    body: "Paint, finish, wheels and spoilers applied to a real GLB model under studio lighting, on a reflective showroom floor."
-  },
-  {
-    index: "02",
-    title: "Geometric Fitting",
-    status: "live",
-    body: "Parts are measured onto each car. Wheels are found by geometry rather than mesh names, and spoilers are raycast onto the boot lid."
-  },
-  {
-    index: "03",
-    title: "ML Recommendations",
-    status: "live",
-    body: "A scikit-learn model scores your inputs and returns the five closest matches from the dataset, served by a Flask API."
-  },
-  {
-    index: "04",
-    title: "Resale Price Prediction",
-    status: "planned",
-    body: "Regression over age, mileage, fuel type and condition to estimate what a car is still worth."
-  },
-  {
-    index: "05",
-    title: "Vision: Car Detection",
-    status: "planned",
-    body: "Upload a photo, detect the model and body type, then open the matching car in the configurator."
-  },
-  {
-    index: "06",
-    title: "Damage Assessment",
-    status: "planned",
-    body: "Locate scratches, dents and cracks from photographs, then grade severity and estimate repair cost."
-  }
-];
-
-const steps = [
-  { index: "01", title: "Choose a platform", body: "Every model normalised to a common scale and stood on the floor." },
-  { index: "02", title: "Build the spec", body: "Dozens of paint shades, three finishes, wheel and spoiler options with live pricing." },
-  { index: "03", title: "Let the model match you", body: "Feed your numbers to the recommender and compare what comes back." }
-];
-
 function Reveal({ children, delay = 0, className = "" }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 18 }}
+      initial={{ opacity: 0, y: 26 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.5, ease: "easeOut", delay }}
+      viewport={{ once: true, margin: "-70px" }}
+      transition={{ duration: 0.65, ease: [0.2, 0.8, 0.2, 1], delay }}
       className={className}
     >
       {children}
     </motion.div>
+  );
+}
+
+// Counts up when it first comes into view. A number that arrives already
+// finished reads as decoration; one that climbs reads as a measurement.
+function Counter({ to, suffix = "", decimals = 0, duration = 1400 }) {
+  const ref = useRef(null);
+  const seen = useInView(ref, { once: true, margin: "-40px" });
+  const [value, setValue] = useState(0);
+
+  useEffect(() => {
+    if (!seen) return;
+
+    let frame;
+
+    // Someone who has asked for less motion gets the finished number, but on
+    // the next frame rather than during the effect itself.
+    if (prefersReducedMotion()) {
+      frame = requestAnimationFrame(() => setValue(to));
+      return () => cancelAnimationFrame(frame);
+    }
+
+    const started = performance.now();
+
+    const step = (now) => {
+      const progress = Math.min((now - started) / duration, 1);
+      // Fast at first, easing to a stop, like a needle settling.
+      setValue(to * (1 - Math.pow(1 - progress, 3)));
+      if (progress < 1) frame = requestAnimationFrame(step);
+    };
+
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [seen, to, duration]);
+
+  return (
+    <span ref={ref} className="readout">
+      {value.toFixed(decimals)}
+      {suffix}
+    </span>
   );
 }
 
@@ -123,266 +117,332 @@ function HeroLoader() {
   if (!active) return null;
 
   return (
-    <div className="absolute bottom-8 left-5 z-20 md:left-8">
+    <div className="absolute bottom-6 left-5 z-30 md:left-8">
       <p className="label">Loading geometry — {Math.round(progress)}%</p>
-      <div className="sweep relative mt-2 h-[2px] w-44 overflow-hidden bg-line" />
+      <div className="sweep relative mt-2 h-[2px] w-44 overflow-hidden rounded-full bg-line" />
     </div>
   );
 }
+
+const numbers = [
+  { value: 15, suffix: "", label: "cars in 3D", note: "each one measured, not hand placed" },
+  { value: 166, suffix: "", label: "models matched", note: "Indian market, real prices" },
+  { value: 83, suffix: "%", label: "damage accuracy", note: "on photos it never trained on" },
+  { value: 0, suffix: "", label: "photos uploaded", note: "vision runs on your device" }
+];
+
+const marquee = [
+  "Wheels found by geometry, not by name",
+  "Paint that leaves the headlights alone",
+  "Every engine note built from its own cylinder count",
+  "Damage named by a trained model",
+  "Prices in ₹, from Indian listings",
+  "Nothing leaves your phone"
+];
 
 export default function HomePage() {
   const { index, showing, goTo, still } = useCarCarousel(HERO_SEQUENCE.length);
   const activeCar = HERO_SEQUENCE[index];
 
   return (
-    <div>
+    <div className="overflow-hidden">
 
       {/* ================= HERO ================= */}
-      <section className="relative grid-veil border-b border-line-soft">
-        <div className="relative mx-auto min-h-[calc(100vh-4rem)] max-w-[1500px] px-5 md:px-8">
+      <section className="relative">
+        {/* Light behind the car, drifting. This is what stops the page reading
+            as a black rectangle before anything has loaded. */}
+        <div className="aurora" />
+
+        <div className="relative mx-auto min-h-[100svh] max-w-[1500px] px-5 md:px-8">
 
           {/* 3D LAYER */}
           <div className="absolute inset-0 z-0">
             <HeroScene car={activeCar} visible={showing} spin={!still} />
           </div>
 
-          {/* CAR SELECTOR */}
-          <div className="absolute right-5 bottom-8 z-30 hidden md:block">
-            <p className="label mb-3 text-right">Now showing</p>
-
-            <div className="flex flex-col items-end gap-1.5">
-              {HERO_SEQUENCE.map((car, i) => {
-                const active = i === index;
-
-                return (
-                  <button
-                    key={car.id}
-                    type="button"
-                    onClick={() => goTo(i)}
-                    className={[
-                      "group flex items-center gap-3 transition-colors",
-                      active ? "text-chalk" : "text-fog hover:text-chalk"
-                    ].join(" ")}
-                  >
-                    <span className="readout text-[11px]">{car.name}</span>
-                    <span
-                      className={[
-                        "block h-[2px] transition-all",
-                        active
-                          ? "w-8 bg-signal"
-                          : "w-3 bg-line group-hover:w-5 group-hover:bg-fog"
-                      ].join(" ")}
-                    />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* GRADIENT SO TYPE STAYS READABLE OVER THE CAR */}
-          <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-r from-ink via-ink/70 to-transparent" />
+          {/* Type has to stay readable over whatever colour the car is. Dark
+              from the bottom on a phone, where the car sits behind the words;
+              dark from the left on a wide screen, where it sits beside them. */}
+          <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-ink via-ink/75 to-transparent md:bg-gradient-to-r md:from-ink md:via-ink/70 md:to-transparent" />
 
           <HeroLoader />
 
-          <div className="relative z-20 flex min-h-[calc(100vh-4rem)] flex-col justify-center py-20">
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.6 }}
-              className="label"
-            >
-              3D Configurator / Machine Learning
-            </motion.p>
-
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }}
+          <div className="relative z-20 flex min-h-[100svh] flex-col justify-center py-24">
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.08 }}
-              className="mt-5 max-w-2xl text-5xl leading-[0.95] font-semibold tracking-tight md:text-7xl"
+              transition={{ duration: 0.6 }}
+              className="flex w-fit items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 backdrop-blur-sm"
             >
-              Build the car,
-              <br />
-              then let the
-              <br />
-              <span className="text-signal">model</span> find it.
-            </motion.h1>
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-signal opacity-70" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-signal" />
+              </span>
+              <span className="label text-fog">Live in your browser · no install</span>
+            </motion.div>
+
+            <h1 className="mt-7 max-w-3xl text-[clamp(2.75rem,8vw,5.75rem)] leading-[0.92] font-semibold tracking-tight">
+              {["See your car", "before you", "change a thing."].map((line, i) => (
+                <motion.span
+                  key={line}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.7, delay: 0.1 + i * 0.1, ease: [0.2, 0.8, 0.2, 1] }}
+                  className="block"
+                >
+                  {i === 2 ? (
+                    <>
+                      change <span className="text-gradient">a thing.</span>
+                    </>
+                  ) : (
+                    line
+                  )}
+                </motion.span>
+              ))}
+            </h1>
 
             <motion.p
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.16 }}
-              className="mt-7 max-w-lg text-base leading-relaxed text-fog"
+              transition={{ duration: 0.6, delay: 0.42 }}
+              className="mt-8 max-w-xl text-lg leading-relaxed text-fog"
             >
-              Configure a car in real time in the browser, then hand your
-              requirements to a trained recommender and see which cars actually
-              fit them.
+              Wheels, stance, paint, exhaust — fitted to a real 3D model by
+              measuring the car itself. Not a picture of a car like yours. Yours.
             </motion.p>
 
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.24 }}
+              transition={{ duration: 0.6, delay: 0.5 }}
               className="mt-10 flex flex-wrap gap-3"
             >
-              <Link to="/configure" className="btn btn-signal">
-                Open Configurator
+              <Link to="/customise" className="btn btn-signal">
+                Start building
               </Link>
-              <Link to="/recommend" className="btn btn-ghost">
-                Run AI Match
+              <Link to="/discover" className="btn btn-ghost">
+                Find me a car
               </Link>
             </motion.div>
 
-            {/* ACTIVE CAR, FOR SCREENS TOO NARROW FOR THE SELECTOR */}
-            <div className="mt-10 flex items-center gap-3 md:hidden">
-              <span className="label">Now showing</span>
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={activeCar.id}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.25 }}
-                  className="readout text-sm text-chalk"
-                >
-                  {activeCar.name}
-                </motion.span>
-              </AnimatePresence>
-            </div>
-
-            {/* HUD READOUTS */}
-            <motion.dl
+            {/* WHICH CAR IS ON SCREEN */}
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.36 }}
-              className="mt-16 flex flex-wrap gap-x-12 gap-y-6"
+              transition={{ duration: 0.6, delay: 0.7 }}
+              className="mt-14"
             >
-              {[
-                ["Models", String(cars.length).padStart(2, "0")],
-                ["Paint shades", String(totalShades)],
-                ["Finishes", String(Object.keys(finishes).length).padStart(2, "0")],
-                ["Matches returned", "05"]
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <dd className="readout text-3xl text-chalk">{value}</dd>
-                  <dt className="label mt-1">{label}</dt>
-                </div>
+              <p className="label mb-3">Now showing</p>
+
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
+                {HERO_SEQUENCE.map((car, i) => {
+                  const active = i === index;
+
+                  return (
+                    <button
+                      key={car.id}
+                      type="button"
+                      onClick={() => goTo(i)}
+                      className={[
+                        "group flex items-center gap-2 transition-colors",
+                        active ? "text-chalk" : "text-fog hover:text-chalk"
+                      ].join(" ")}
+                    >
+                      <span
+                        className={[
+                          "block h-[2px] rounded-full transition-all duration-300",
+                          active
+                            ? "w-7 bg-gradient-to-r from-signal to-flare"
+                            : "w-3 bg-line group-hover:w-5 group-hover:bg-fog"
+                        ].join(" ")}
+                      />
+                      <span className="readout text-[11px]">{car.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </div>
+
+          {/* SCROLL CUE */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 1, 1, 0], y: [0, 0, 10, 14] }}
+            transition={{ duration: 2.6, repeat: Infinity, delay: 1.4 }}
+            className="pointer-events-none absolute bottom-6 left-1/2 z-20 hidden -translate-x-1/2 md:block"
+          >
+            <span className="label">Scroll</span>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ================= MARQUEE ================= */}
+      <section className="relative border-y border-white/8 py-5">
+        <div className="marquee-track">
+          {[0, 1].map((copy) => (
+            <div key={copy} className="flex shrink-0 items-center" aria-hidden={copy === 1}>
+              {marquee.map((line) => (
+                <span key={line} className="flex items-center whitespace-nowrap">
+                  <span className="px-7 text-sm text-fog">{line}</span>
+                  <span className="h-1 w-1 rounded-full bg-signal/60" />
+                </span>
               ))}
-            </motion.dl>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ================= WHAT IT DOES ================= */}
+      <section className="mx-auto max-w-[1500px] px-5 py-24 md:px-8 md:py-32">
+        <Reveal>
+          <p className="label">Five things it does</p>
+          <h2 className="mt-4 max-w-2xl text-4xl leading-[1.05] font-semibold tracking-tight md:text-5xl">
+            Every part of it answers <span className="text-gradient">a real question</span>.
+          </h2>
+        </Reveal>
+
+        <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {SECTIONS.map((section, i) => (
+            <Reveal key={section.to} delay={i * 0.07}>
+              <Link
+                to={section.to}
+                className="panel lift group flex h-full flex-col p-7"
+              >
+                <span className="label">{`0${i + 1}`}</span>
+
+                <span className="mt-5 text-2xl font-semibold tracking-tight">
+                  {section.label}
+                </span>
+
+                <span className="mt-2 text-[15px] leading-relaxed text-chalk/85">
+                  {section.blurb}
+                </span>
+
+                <span className="mt-5 text-sm leading-relaxed text-fog">
+                  {section.kicker}
+                </span>
+
+                <span className="mt-7 flex items-center gap-2 text-sm text-signal">
+                  Open
+                  <span className="transition-transform duration-300 group-hover:translate-x-1.5">
+                    →
+                  </span>
+                </span>
+              </Link>
+            </Reveal>
+          ))}
+
+          <Reveal delay={SECTIONS.length * 0.07}>
+            <Link
+              to="/garage"
+              className="panel lift group flex h-full flex-col justify-between p-7"
+            >
+              <div>
+                <span className="label">Your account</span>
+                <span className="mt-5 block text-2xl font-semibold tracking-tight">
+                  Garage
+                </span>
+                <span className="mt-2 block text-[15px] leading-relaxed text-chalk/85">
+                  Everything you have saved, in one place
+                </span>
+              </div>
+              <span className="mt-7 flex items-center gap-2 text-sm text-signal">
+                Open
+                <span className="transition-transform duration-300 group-hover:translate-x-1.5">
+                  →
+                </span>
+              </span>
+            </Link>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ================= WHY ================= */}
+      <section className="relative overflow-hidden border-y border-white/8">
+        <div className="grid-veil absolute inset-0" />
+
+        <div className="relative mx-auto max-w-[1500px] px-5 py-24 md:px-8 md:py-32">
+          <div className="grid gap-14 lg:grid-cols-2 lg:gap-20">
+            <Reveal>
+              <p className="label">Why this exists</p>
+              <h2 className="mt-4 text-4xl leading-[1.05] font-semibold tracking-tight md:text-5xl">
+                Plausible is not
+                <br />
+                <span className="text-gradient">the same as true.</span>
+              </h2>
+            </Reveal>
+
+            <Reveal delay={0.12}>
+              <div className="space-y-6 text-[17px] leading-relaxed text-fog">
+                <p>
+                  This started with one car and one question: what would it look
+                  like lowered, on different wheels? The obvious answer was to
+                  photograph it and ask an image model.
+                </p>
+                <p className="text-chalk">
+                  What came back was always convincing and never right. The
+                  proportions drifted. The wheels sat where wheels usually sit,
+                  not where they sit on that car. It was a picture of a car like
+                  mine.
+                </p>
+                <p>
+                  So everything here is measured instead of imagined. Wheels are
+                  found by their geometry rather than by what a modeller happened
+                  to name them. An exhaust is placed against the actual rear
+                  valance. Paint is kept off the lamps because the lamps are
+                  found first.
+                </p>
+                <p className="text-chalk">
+                  It is slower to build that way, and it is the only way the
+                  answer is worth anything.
+                </p>
+              </div>
+            </Reveal>
           </div>
         </div>
       </section>
 
-      {/* ================= CAPABILITIES ================= */}
-      <section className="mx-auto max-w-[1500px] px-5 py-24 md:px-8">
-        <Reveal>
-          <p className="label">What is built</p>
-          <h2 className="mt-4 max-w-xl text-3xl font-semibold tracking-tight md:text-4xl">
-            Three systems running, three on the bench.
-          </h2>
-          <div className="tick-rule mt-8 opacity-70" />
-        </Reveal>
-
-        <div className="mt-12 grid gap-px bg-line-soft md:grid-cols-2 lg:grid-cols-3">
-          {capabilities.map((item, i) => (
-            <Reveal key={item.index} delay={i * 0.05}>
-              <article className="h-full bg-ink p-7 transition-colors hover:bg-panel">
-                <div className="flex items-center justify-between">
-                  <span className="label">{item.index}</span>
-                  <span
-                    className={[
-                      "readout text-[10px] uppercase tracking-widest",
-                      item.status === "live" ? "text-data" : "text-fog"
-                    ].join(" ")}
-                  >
-                    {item.status === "live" ? "● Live" : "○ Planned"}
-                  </span>
-                </div>
-
-                <h3 className="mt-6 text-xl font-medium tracking-tight">{item.title}</h3>
-                <p className="mt-3 text-sm leading-relaxed text-fog">{item.body}</p>
-              </article>
+      {/* ================= NUMBERS ================= */}
+      <section className="mx-auto max-w-[1500px] px-5 py-24 md:px-8 md:py-28">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+          {numbers.map((item, i) => (
+            <Reveal key={item.label} delay={i * 0.08}>
+              <p className="text-5xl font-semibold tracking-tight md:text-6xl">
+                <Counter to={item.value} suffix={item.suffix} />
+              </p>
+              <p className="mt-3 text-chalk">{item.label}</p>
+              <p className="mt-1 text-sm leading-relaxed text-fog">{item.note}</p>
             </Reveal>
           ))}
         </div>
       </section>
 
-      {/* ================= PROCESS ================= */}
-      <section className="border-y border-line-soft bg-panel">
-        <div className="mx-auto max-w-[1500px] px-5 py-24 md:px-8">
+      {/* ================= CTA ================= */}
+      <section className="relative overflow-hidden border-t border-white/8">
+        <div className="aurora opacity-40" />
+
+        <div className="relative mx-auto max-w-[1500px] px-5 py-28 text-center md:px-8 md:py-36">
           <Reveal>
-            <p className="label">How it runs</p>
+            <h2 className="mx-auto max-w-3xl text-4xl leading-[1.05] font-semibold tracking-tight md:text-6xl">
+              Pick a car. Change everything.
+              <br />
+              <span className="text-gradient">See it properly.</span>
+            </h2>
           </Reveal>
 
-          <div className="mt-12 grid gap-12 md:grid-cols-3">
-            {steps.map((step, i) => (
-              <Reveal key={step.index} delay={i * 0.08}>
-                <div className="tick-rule-dense opacity-70" />
-                <p className="readout mt-6 text-2xl text-signal">{step.index}</p>
-                <h3 className="mt-3 text-lg font-medium tracking-tight">{step.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-fog">{step.body}</p>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ================= GARAGE ================= */}
-      <section className="mx-auto max-w-[1500px] px-5 py-24 md:px-8">
-        <Reveal>
-          <div className="flex flex-wrap items-end justify-between gap-6">
-            <div>
-              <p className="label">In the garage</p>
-              <h2 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">
-                {cars.length} platforms, one configurator.
-              </h2>
-            </div>
-            <Link to="/configure" className="btn btn-ghost">
-              Configure a car
-            </Link>
-          </div>
-        </Reveal>
-
-        <div className="mt-12 border-t border-line-soft">
-          {cars.map((car, i) => (
-            <Reveal key={car.id} delay={i * 0.04}>
-              <Link
-                to="/configure"
-                className="group flex items-center justify-between gap-6 border-b border-line-soft py-6 transition-colors hover:bg-panel"
-              >
-                <div className="flex items-baseline gap-6">
-                  <span className="label">{String(i + 1).padStart(2, "0")}</span>
-                  <span className="text-xl font-medium tracking-tight md:text-2xl">
-                    {car.name}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-6">
-                  <span className="label hidden sm:block">{car.bodyStyle}</span>
-                  <span className="text-fog transition-colors group-hover:text-signal">→</span>
-                </div>
-              </Link>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      {/* ================= CLOSING ================= */}
-      <section className="border-t border-line-soft">
-        <div className="hud-frame mx-auto max-w-[1500px] px-5 py-24 text-center md:px-8">
-          <Reveal>
-            <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight md:text-5xl">
-              Start with a blank car.
-            </h2>
-            <p className="mx-auto mt-5 max-w-md text-sm leading-relaxed text-fog">
-              Pick a platform, set the paint, fit the wheels, then see what the
-              recommender makes of your numbers.
+          <Reveal delay={0.12}>
+            <p className="mx-auto mt-7 max-w-xl leading-relaxed text-fog">
+              Fifteen cars, every part priced in rupees, and nothing to install.
             </p>
-            <div className="mt-10 flex flex-wrap justify-center gap-3">
-              <Link to="/configure" className="btn btn-signal">
-                Open Configurator
+          </Reveal>
+
+          <Reveal delay={0.2}>
+            <div className="mt-11 flex flex-wrap justify-center gap-3">
+              <Link to="/customise" className="btn btn-signal">
+                Start building
               </Link>
-              <Link to="/recommend" className="btn btn-ghost">
-                Run AI Match
+              <Link to="/value" className="btn btn-ghost">
+                Check a car's value
               </Link>
             </div>
           </Reveal>

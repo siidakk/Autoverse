@@ -74,7 +74,7 @@ export default function GaragePage() {
               <p className="label">
                 {builds === null ? "Loading" : `${builds.length} saved`}
               </p>
-              <Link to="/configure" className="label hover:text-signal">
+              <Link to="/customise" className="label hover:text-signal">
                 Build another →
               </Link>
             </div>
@@ -137,7 +137,7 @@ export default function GaragePage() {
 
                   <div className="mt-5 flex gap-2">
                     <Link
-                      to={`/configure?build=${build.code}`}
+                      to={`/customise?build=${build.code}`}
                       className="btn btn-ghost flex-1 text-[10px]"
                     >
                       Open
@@ -173,7 +173,7 @@ export default function GaragePage() {
               return (
                 <Link
                   key={entry.id}
-                  to={`/configure?car=${car.id}`}
+                  to={`/customise?car=${car.id}`}
                   className="group flex items-center justify-between border-b border-line-soft py-4 transition-colors hover:bg-panel"
                 >
                   <span className="text-sm">{car.name}</span>

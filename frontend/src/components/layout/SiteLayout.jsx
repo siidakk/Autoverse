@@ -5,7 +5,7 @@ import SiteFooter from "./SiteFooter";
 
 // The configurator is an app screen rather than a page, so it runs edge to edge
 // with no footer underneath it.
-const APP_ROUTES = ["/configure"];
+const APP_ROUTES = ["/customise"];
 
 export default function SiteLayout() {
   const { pathname } = useLocation();

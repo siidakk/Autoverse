@@ -319,7 +319,7 @@ export default function DetectPage() {
                   </p>
 
                   <Link
-                    to={`/configure?car=${match.car.id}&colour=${encodeURIComponent(result.paint.hex)}`}
+                    to={`/customise?car=${match.car.id}&colour=${encodeURIComponent(result.paint.hex)}`}
                     className="btn btn-signal mt-5 w-full"
                   >
                     Open it in your colour

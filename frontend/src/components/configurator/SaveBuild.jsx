@@ -12,7 +12,7 @@ export default function SaveBuild({ buildPayload, onSaved }) {
   const [copied, setCopied] = useState(false);
 
   const shareUrl = code
-    ? `${window.location.origin}/configure?build=${code}`
+    ? `${window.location.origin}/customise?build=${code}`
     : null;
 
   const save = async () => {

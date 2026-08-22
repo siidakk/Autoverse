@@ -613,7 +613,7 @@ export default function ControlPanel({
           <SaveBuild buildPayload={buildPayload} onSaved={onSaved} />
         </div>
 
-        <Link to="/recommend" className="btn btn-ghost mt-3 w-full">
+        <Link to="/discover" className="btn btn-ghost mt-3 w-full">
           Find matching cars
         </Link>
       </div>

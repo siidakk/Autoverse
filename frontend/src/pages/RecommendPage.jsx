@@ -109,7 +109,7 @@ function ResultCard({ car, index }) {
       <Accessories items={car.accessories} />
 
       <Link
-        to="/configure"
+        to="/customise"
         className="btn btn-ghost mt-5 w-full"
         title={garage.exact ? undefined : "The nearest car we have a model of"}
       >
