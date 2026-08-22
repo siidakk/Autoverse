@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import MLPanel from "../components/MLPanel";
 import { matchGarageCar } from "../data/garageMatch";
+import { describeAccessory } from "../data/accessories";
 
 const lakh = (value) =>
   value >= 100000
@@ -25,16 +26,20 @@ function Accessories({ items }) {
       <p className="label">Parts that suit it</p>
 
       <ul className="mt-3 space-y-1.5">
-        {items.map((item) => (
-          <li key={`${item.category}-${item.value}`} className="flex justify-between gap-3">
-            <span className="readout text-[11px] text-chalk capitalize">
-              {item.category.replace(/([A-Z])/g, " $1").toLowerCase()}
-              {": "}
-              <span className="text-signal">{String(item.value)}</span>
-            </span>
-            <span className="text-[11px] text-fog">{item.why}</span>
-          </li>
-        ))}
+        {items.map((item) => {
+          const part = describeAccessory(item.category, item.value);
+
+          return (
+            <li key={`${item.category}-${item.value}`} className="flex justify-between gap-3">
+              <span className="readout shrink-0 text-[11px] text-chalk">
+                {part.label}
+                {": "}
+                <span className="text-signal">{part.value}</span>
+              </span>
+              <span className="text-right text-[11px] leading-snug text-fog">{item.why}</span>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -129,7 +134,7 @@ export default function RecommendPage() {
     <div className="mx-auto max-w-[1500px] px-5 py-14 md:px-8">
 
       <header>
-        <p className="label">02 / AI Match</p>
+        <p className="label">02 / Discover</p>
         <h1 className="mt-4 max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">
           Tell it how you drive.
         </h1>

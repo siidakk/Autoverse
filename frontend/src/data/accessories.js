@@ -110,3 +110,46 @@ export const priceOf = (options, value) =>
   options.find((option) => option.value === value)?.price ?? 0;
 
 export const formatRupees = (value) => `₹${value.toLocaleString("en-IN")}`;
+
+
+// Turning a suggestion from the recommender into words.
+//
+// The ML service answers in the same vocabulary the configurator uses --
+// {category: "wheelSize", value: 2} -- because that is what gets applied when
+// somebody clicks through to build it. Printed raw it reads "wheel size: 2",
+// so the label each option already carries is used instead.
+const BY_CATEGORY = {
+  wheels: wheelOptions,
+  wheelSize: wheelSizes,
+  stance: stanceLevels,
+  spoiler: spoilerOptions,
+  exhaust: exhaustOptions,
+  headlights: headlightOptions,
+  underglow: underglowOptions,
+  wrap: wrapOptions,
+  tint: tintOptions
+};
+
+const CATEGORY_LABELS = {
+  wheels: "Wheels",
+  wheelSize: "Rim size",
+  stance: "Ride height",
+  spoiler: "Spoiler",
+  exhaust: "Exhaust",
+  headlights: "Headlights",
+  underglow: "Underglow",
+  wrap: "Wrap",
+  tint: "Tint"
+};
+
+export function describeAccessory(category, value) {
+  const options = BY_CATEGORY[category];
+  const match = options?.find((option) => String(option.value) === String(value));
+
+  return {
+    label: CATEGORY_LABELS[category] ?? category,
+    // Falls back to the raw value rather than hiding the suggestion, so a
+    // category added on the Python side still shows something.
+    value: match?.label ?? String(value)
+  };
+}

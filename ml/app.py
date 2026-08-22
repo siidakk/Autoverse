@@ -29,6 +29,8 @@ scaler = bundle["scaler"]
 FEATURES = bundle["features"]
 LATEST_YEAR = bundle["latest_year"]
 
+from accessories import accessories_for
+
 app = Flask(__name__)
 CORS(app)
 
@@ -171,43 +173,6 @@ def reasons_for(row, preferences):
         reasons.append("Commonly owned, parts are easy")
 
     return reasons[:4]
-
-
-# Which accessories suit which kind of car. This is the second half of what the
-# recommender is for: the parts, not just the car.
-def accessories_for(row, preferences):
-    body = row["body"]
-    sporty = preferences["priority"] == "performance" or preferences["driving"] == "spirited"
-    premium = row["segment"] in ("Premium", "Luxury")
-
-    picks = []
-
-    if sporty:
-        picks.append({"category": "wheels", "value": "sport", "why": "Matches how you drive"})
-        picks.append({"category": "wheelSize", "value": 2, "why": "Fills the arches"})
-        picks.append({
-            "category": "spoiler",
-            "value": "racing" if body in ("Hatchback", "Sedan") else "sport",
-            "why": "Suits the shape"
-        })
-        picks.append({"category": "stance", "value": 0.45, "why": "Lowered, not slammed"})
-    elif premium:
-        picks.append({"category": "wheels", "value": "sport", "why": "Cleaner than the stock rim"})
-        picks.append({"category": "tint", "value": "dark", "why": "Usual on this segment"})
-        picks.append({"category": "wrap", "value": "roof", "why": "Contrast roof, common here"})
-    else:
-        picks.append({"category": "wheels", "value": "classic", "why": "Honest and cheap to keep"})
-        picks.append({"category": "tint", "value": "light", "why": "Cuts the heat"})
-
-    if body in ("SUV", "MPV"):
-        picks.append({"category": "exhaust", "value": "twin", "why": "Sits well under a high bumper"})
-    elif sporty:
-        picks.append({"category": "exhaust", "value": "quad", "why": "Matches the build"})
-
-    if preferences["usage"] == "highway":
-        picks.append({"category": "headlights", "value": "xenon", "why": "Worth it after dark"})
-
-    return picks[:5]
 
 
 @app.route("/health", methods=["GET"])
