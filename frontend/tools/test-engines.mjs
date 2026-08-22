@@ -57,7 +57,7 @@ const v12 = at3000("/models/lamborghini_revuelto.glb");
 const v10 = at3000("/models/audi.glb");
 const v8 = at3000("/models/2020_chevrolet_corvette_c8_stingray_convertible.glb");
 const i6 = at3000("/models/bmw.glb");
-const i4 = at3000("/models/honda_civic_2022_free_download.glb");
+const i4 = at3000("/models/honda_civic.glb");
 
 console.log(`\n  At 3000 rpm: ${DIM}V12${OFF} ${v12.toFixed(0)} Hz · ${DIM}V10${OFF} ${v10.toFixed(0)} · ` +
   `${DIM}V8${OFF} ${v8.toFixed(0)} · ${DIM}straight six${OFF} ${i6.toFixed(0)} · ${DIM}four${OFF} ${i4.toFixed(0)}`);

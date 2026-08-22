@@ -37,3 +37,6 @@ ml/damage/
 # Deck QA renders, regenerated from the pptx whenever they are needed
 docs/render/
 docs/*.pdf
+
+# Office lock files, left behind while a document is open
+~$*

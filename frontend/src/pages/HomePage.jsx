@@ -1,13 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, useInView } from "framer-motion";
 import { useProgress, useGLTF } from "@react-three/drei";
 import HeroScene from "../components/home/HeroScene";
-import { HERO_SEQUENCE } from "../components/home/heroSequence";
+import { HERO_SEQUENCE, DISPLAY_MS, FADE_MS } from "../components/home/heroSequence";
 import { SECTIONS } from "../data/navigation";
-
-const DISPLAY_MS = 5600;
-const FADE_MS = 700;
 
 const prefersReducedMotion = () =>
   typeof window !== "undefined" &&
@@ -15,33 +12,38 @@ const prefersReducedMotion = () =>
 
 // Holds each car for a while, fades it out, swaps in the next one. Split into
 // two timers so a click can interrupt the cycle cleanly.
+// Holds each car for a while, then hands over to the next.
+//
+// The outgoing car stays mounted for the length of the fade so the two overlap
+// rather than following each other. Previously the old one faded out, was
+// unmounted, and only then did the new one begin -- which left a beat with an
+// empty turntable in the middle of every swap.
 function useCarCarousel(length) {
   const [index, setIndex] = useState(0);
-  const [showing, setShowing] = useState(true);
-  const pending = useRef(null);
+  const [leaving, setLeaving] = useState(null);
   const [still] = useState(prefersReducedMotion);
 
-  useEffect(() => {
-    if (!showing || still) return;
-    const id = window.setTimeout(() => setShowing(false), DISPLAY_MS);
-    return () => window.clearTimeout(id);
-  }, [showing, index, still]);
+  const move = useCallback(
+    (next) => {
+      setLeaving((current) => (current === null ? index : current));
+      setIndex(next);
+    },
+    [index]
+  );
 
   useEffect(() => {
-    if (showing) return;
-
-    const id = window.setTimeout(() => {
-      // Read eagerly: the updater below runs during render, by which point the
-      // ref would already have been cleared.
-      const requested = pending.current;
-      pending.current = null;
-
-      setIndex((current) => requested ?? (current + 1) % length);
-      setShowing(true);
-    }, FADE_MS);
-
+    if (still) return;
+    const id = window.setTimeout(() => move((index + 1) % length), DISPLAY_MS);
     return () => window.clearTimeout(id);
-  }, [showing, length]);
+  }, [index, length, still, move]);
+
+  // Once the crossfade is over the outgoing car is dropped, which is what frees
+  // its materials.
+  useEffect(() => {
+    if (leaving === null) return;
+    const id = window.setTimeout(() => setLeaving(null), FADE_MS);
+    return () => window.clearTimeout(id);
+  }, [leaving]);
 
   // The next model is fetched while the current one is still on screen, so the
   // swap does not stall on a download.
@@ -51,11 +53,10 @@ function useCarCarousel(length) {
 
   const goTo = (next) => {
     if (next === index) return;
-    pending.current = next;
-    setShowing(false);
+    move(next);
   };
 
-  return { index, showing, goTo, still };
+  return { index, leaving, goTo, still };
 }
 
 function Reveal({ children, delay = 0, className = "" }) {
@@ -141,7 +142,7 @@ const marquee = [
 ];
 
 export default function HomePage() {
-  const { index, showing, goTo, still } = useCarCarousel(HERO_SEQUENCE.length);
+  const { index, leaving, goTo, still } = useCarCarousel(HERO_SEQUENCE.length);
   const activeCar = HERO_SEQUENCE[index];
 
   return (
@@ -163,7 +164,11 @@ export default function HomePage() {
               stays full width behind the text with the gradient below doing
               the work. */}
           <div className="absolute inset-0 z-0 md:left-[38%]">
-            <HeroScene car={activeCar} visible={showing} spin={!still} />
+            <HeroScene
+              car={activeCar}
+              leavingCar={leaving === null ? null : HERO_SEQUENCE[leaving]}
+              spin={!still}
+            />
           </div>
 
           {/* Type has to stay readable over whatever colour the car is. Dark

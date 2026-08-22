@@ -3,12 +3,31 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF, Environment, Lightformer, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
 import { inspectCar } from "../../utils/carGeometry";
-import { HERO_SEQUENCE } from "./heroSequence";
+import { HERO_SEQUENCE, SPIN_RATE } from "./heroSequence";
 
 const TARGET_LENGTH = 4.6;
 
-function TurntableCar({ model, visible, spin }) {
+// The turntable itself, which never unmounts.
+//
+// The rotation used to live on the car, and the car is keyed by its model so
+// that switching cars remounts it -- which reset the angle to zero every time.
+// Each car therefore only ever turned through the fifty degrees it managed in
+// the seconds it was on screen, and the back of a car was never once visible.
+//
+// Keeping the turntable above the car means the angle survives every swap, and
+// with one revolution timed to one car, the handover always happens with both
+// cars pointing the same way.
+function Turntable({ spin, children }) {
   const group = useRef();
+
+  useFrame((_, delta) => {
+    if (spin && group.current) group.current.rotation.y += delta * SPIN_RATE;
+  });
+
+  return <group ref={group}>{children}</group>;
+}
+
+function TurntableCar({ model, visible }) {
   const fade = useRef(0);
   const { scene } = useGLTF(model);
 
@@ -51,10 +70,6 @@ function TurntableCar({ model, visible, spin }) {
   }, [car]);
 
   useFrame((_, delta) => {
-    if (spin && group.current) {
-      group.current.rotation.y += delta * 0.16;
-    }
-
     const target = visible ? 1 : 0;
     if (Math.abs(fade.current - target) < 0.002) return;
 
@@ -66,10 +81,8 @@ function TurntableCar({ model, visible, spin }) {
   });
 
   return (
-    <group ref={group}>
-      <group scale={fit.scale} position={fit.position}>
-        <primitive object={car} />
-      </group>
+    <group scale={fit.scale} position={fit.position}>
+      <primitive object={car} />
     </group>
   );
 }
@@ -98,7 +111,7 @@ function Studio() {
   );
 }
 
-export default function HeroScene({ car, visible, spin = true }) {
+export default function HeroScene({ car, leavingCar = null, spin = true }) {
   // Held back until after first paint so a model download never blocks the
   // headline from rendering.
   const [mounted, setMounted] = useState(false);
@@ -127,12 +140,19 @@ export default function HeroScene({ car, visible, spin = true }) {
       />
 
       <Suspense fallback={null}>
-        <TurntableCar
-          key={car.model}
-          model={car.model}
-          visible={visible}
-          spin={spin}
-        />
+        {/* Both cars hang on the same turntable, so through the crossfade they
+            are pointing the same way and one appears to become the other
+            rather than being swapped for it. */}
+        <Turntable spin={spin}>
+          {leavingCar && (
+            <TurntableCar
+              key={leavingCar.model}
+              model={leavingCar.model}
+              visible={false}
+            />
+          )}
+          <TurntableCar key={car.model} model={car.model} visible />
+        </Turntable>
         <Studio />
       </Suspense>
 

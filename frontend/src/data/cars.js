@@ -8,9 +8,9 @@ export const cars = [
   {
     id: 1,
     name: "Honda Civic",
-    model: "/models/honda_civic_2022_free_download.glb",
+    model: "/models/honda_civic.glb",
     bodyStyle: "Sedan",
-    weightMb: 0.5
+    weightMb: 1.5
   },
   {
     id: 2,

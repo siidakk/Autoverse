@@ -38,7 +38,7 @@ const DEFAULT = {
 };
 
 export const ENGINES = {
-  "/models/honda_civic_2022_free_download.glb": {
+  "/models/honda_civic.glb": {
     cylinders: 4, layout: "inline", aspiration: "turbo",
     idle: 750, redline: 6600, capacity: 1.5, clatter: 0, smooth: 0.6,
     label: "1.5 turbo inline four"
