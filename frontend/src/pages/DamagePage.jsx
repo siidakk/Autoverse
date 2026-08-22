@@ -10,6 +10,7 @@ import {
   PANELS
 } from "../lib/damage";
 import { valuationOptions, valueCar, describeError } from "../lib/api";
+import { scan as scanWithModel, modelInfo } from "../lib/damageModel";
 
 const rupees = (value) =>
   value >= 100000
@@ -79,12 +80,40 @@ export default function DamagePage() {
     setScanError(null);
     setScan(null);
 
+    const imageSize = {
+      width: imageRef.current.naturalWidth,
+      height: imageRef.current.naturalHeight
+    };
+
     try {
+      // The trained classifier first. It only answers if someone has built it
+      // and put it in public/models/damage; until then this returns nothing
+      // and the measured version below still runs.
+      const learned = await scanWithModel(imageRef.current, setStatus);
+
+      if (learned) {
+        const info = modelInfo();
+
+        setScan({
+          source: "model",
+          candidates: learned.findings.map((finding) => ({
+            box: [finding.x, finding.y, finding.width, finding.height],
+            label: finding.label,
+            confidence: finding.confidence
+          })),
+          carFound: true,
+          accuracy: info?.accuracy ?? null,
+          testedOn: info?.testedOn ?? null,
+          imageSize
+        });
+        return;
+      }
+
       const found = await inspectPhoto(imageRef.current, setStatus);
 
       const box = found.found
         ? found.box
-        : [0, 0, imageRef.current.naturalWidth, imageRef.current.naturalHeight];
+        : [0, 0, imageSize.width, imageSize.height];
 
       setStatus("Looking over the panels");
 
@@ -97,12 +126,10 @@ export default function DamagePage() {
       const candidates = findCandidates(imageRef.current, box, { paint });
 
       setScan({
+        source: "heuristic",
         candidates,
         carFound: found.found,
-        imageSize: {
-          width: imageRef.current.naturalWidth,
-          height: imageRef.current.naturalHeight
-        }
+        imageSize
       });
     } catch (error) {
       setScanError(error.message);
@@ -191,7 +218,9 @@ export default function DamagePage() {
                     }}
                   >
                     <span className="readout absolute -top-4 left-0 bg-signal px-1 text-[9px] leading-4 whitespace-nowrap text-ink">
-                      {index + 1}. {strength(candidate.score)}
+                      {candidate.label
+                        ? `${candidate.label.replace(/_/g, " ")} ${Math.round(candidate.confidence * 100)}%`
+                        : `${index + 1}. ${strength(candidate.score)}`}
                     </span>
                   </div>
                 ))}
@@ -238,12 +267,30 @@ export default function DamagePage() {
                   ? `${scan.candidates.length} area${scan.candidates.length > 1 ? "s" : ""} worth checking`
                   : "Nothing stood out"}
               </p>
-              <p className="mt-3 text-xs leading-relaxed text-fog">
-                {scan.candidates.length
-                  ? "These are places where the paint stops being smooth. That is what a scratch or a crease looks like to a gradient, and it is also what a reflection looks like, so they are candidates rather than a diagnosis. Confirm what they are on the right."
-                  : "The paint reads as even across the panels in view. That is not proof there is nothing there, only that nothing stood out from the surface around it."}
-                {!scan.carFound && " No car was detected in the frame, so the whole photo was scanned."}
-              </p>
+              {scan.source === "model" ? (
+                <p className="mt-3 text-xs leading-relaxed text-fog">
+                  {scan.candidates.length
+                    ? "Each label is what the classifier recognised in that part of the photo, with how sure it is. It was trained on photographs of real damage, so it is naming what it has seen before rather than reporting that the surface looks busy. It still cannot tell you how deep anything is — confirm the severity on the right."
+                    : "Nothing in the photo matched any damage it was trained on. It was shown undamaged panels too, so this is an answer rather than a shrug — but a photo taken far away or in poor light can hide a lot."}
+                  {scan.accuracy != null && (
+                    <span className="mt-2 block text-fog/70">
+                      Measured at {Math.round(scan.accuracy * 100)}% on {scan.testedOn} images it
+                      was never trained on.
+                    </span>
+                  )}
+                </p>
+              ) : (
+                <p className="mt-3 text-xs leading-relaxed text-fog">
+                  {scan.candidates.length
+                    ? "These are places where the paint stops being smooth. That is what a scratch or a crease looks like to a gradient, and it is also what a reflection looks like, so they are candidates rather than a diagnosis. Confirm what they are on the right."
+                    : "The paint reads as even across the panels in view. That is not proof there is nothing there, only that nothing stood out from the surface around it."}
+                  {!scan.carFound && " No car was detected in the frame, so the whole photo was scanned."}
+                  <span className="mt-2 block text-fog/70">
+                    This is the measured fallback, not the trained model — no model has been
+                    built into public/models/damage yet.
+                  </span>
+                </p>
+              )}
             </div>
           )}
 

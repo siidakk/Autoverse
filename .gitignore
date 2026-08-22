@@ -27,3 +27,9 @@ Thumbs.db
 
 # Local database files
 backend/.data/
+
+# CarDD and anything cut from it. The dataset is licensed for non-commercial
+# research and education, and its images are Flickr and Shutterstock content
+# that the dataset does not own. None of it is redistributed from here.
+ml/data/
+ml/damage/
