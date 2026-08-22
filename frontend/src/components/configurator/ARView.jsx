@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { arAvailable, unavailableBecause, startAR } from "../../lib/ar";
+import QRCode from "qrcode";
+import { arAvailable, unavailableBecause, startAR, isDeviceLimitation } from "../../lib/ar";
 
 // The button that puts the car on your driveway, and the controls that stay
 // reachable while it is there.
@@ -21,8 +22,24 @@ export default function ARView({ car, colour }) {
   const [error, setError] = useState(null);
   const [size, setSize] = useState(1);
 
+  const [qr, setQr] = useState(null);
+  const [handoff, setHandoff] = useState(false);
+
   const overlay = useRef(null);
   const handle = useRef(null);
+
+  // A laptop cannot do this, and telling someone that and stopping is a dead
+  // end. The build is entirely in the address bar, so the whole thing can be
+  // handed to a phone by pointing its camera at the screen.
+  useEffect(() => {
+    if (!handoff) return;
+
+    QRCode.toDataURL(window.location.href, {
+      width: 220,
+      margin: 1,
+      color: { dark: "#eef1f8ff", light: "#0c0e1aff" }
+    }).then(setQr, () => setQr(null));
+  }, [handoff]);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,7 +98,49 @@ export default function ARView({ car, colour }) {
       </button>
 
       {can === false && (
-        <p className="text-xs leading-relaxed text-fog">{unavailableBecause()}</p>
+        <div className="space-y-3">
+          <p className="text-xs leading-relaxed text-fog">{unavailableBecause()}</p>
+
+          {isDeviceLimitation() && (
+            <>
+              <button
+                type="button"
+                onClick={() => setHandoff((open) => !open)}
+                className="btn btn-ghost w-full"
+              >
+                {handoff ? "Hide the code" : "Send it to my phone"}
+              </button>
+
+              {handoff && (
+                <div className="panel p-4 text-center">
+                  {qr ? (
+                    <img
+                      src={qr}
+                      alt="Scan to open this build on a phone"
+                      className="mx-auto rounded-lg"
+                      width={200}
+                      height={200}
+                    />
+                  ) : (
+                    <p className="label">Building the code…</p>
+                  )}
+
+                  <p className="mt-3 text-xs leading-relaxed text-fog">
+                    Scan with an Android phone. The whole build travels in the
+                    link, so it opens exactly as you have it here.
+                  </p>
+
+                  {/localhost|127\.0\.0\.1/.test(window.location.host) && (
+                    <p className="mt-2 text-xs leading-relaxed text-signal">
+                      This is a local address, so a phone cannot reach it. It
+                      will work from the deployed site.
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       )}
 
       {can === true && !running && !error && (

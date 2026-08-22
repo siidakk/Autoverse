@@ -12,15 +12,29 @@ export default function SiteLayout() {
   const isAppScreen = APP_ROUTES.includes(pathname);
 
   return (
-    <div className="flex min-h-screen flex-col bg-ink">
+    // An app screen gets exactly the height left over after the header, worked
+    // out by the layout rather than by subtracting a number that has to be kept
+    // in step with the header's own height and border. Getting that number
+    // wrong is how the configurator's footer ended up off the bottom of the
+    // screen and drawn over its own content.
+    <div
+      className={[
+        "flex flex-col bg-ink",
+        isAppScreen ? "h-svh overflow-hidden" : "min-h-screen"
+      ].join(" ")}
+    >
       <NavBar />
 
+      {/* Pages rise a little as they arrive. An app screen does not: it is
+          already exactly as tall as the space it has, and sliding it down
+          eight pixels inside a container that hides its overflow crops the
+          bottom of the panel for as long as the animation lasts. */}
       <motion.main
         key={pathname}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={isAppScreen ? { opacity: 0 } : { opacity: 0, y: 8 }}
+        animate={isAppScreen ? { opacity: 1 } : { opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: "easeOut" }}
-        className="flex-1"
+        className={isAppScreen ? "min-h-0 flex-1" : "flex-1"}
       >
         <Outlet />
       </motion.main>

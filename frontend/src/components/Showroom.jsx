@@ -512,7 +512,10 @@ export default function Showroom() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col lg:flex-row">
+    // Fills whatever the layout has left after the header. On a phone the two
+    // halves stack and the page scrolls; from lg they sit side by side and each
+    // scrolls on its own.
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
 
       <CarList
         selected={selectedCar}

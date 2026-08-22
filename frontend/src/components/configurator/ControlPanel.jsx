@@ -27,7 +27,12 @@ const TABS = [
   { id: "paint", label: "Paint" },
   { id: "wheels", label: "Wheels" },
   { id: "body", label: "Body" },
-  { id: "extras", label: "Extras" }
+  { id: "extras", label: "Extras" },
+  // AR and the shared room started life in the footer, which turned the footer
+  // into 487 pixels of buttons above a 203 pixel window onto the actual
+  // controls. They are things you do with a finished build rather than parts of
+  // building it, so they get a tab.
+  { id: "share", label: "Share" }
 ];
 
 function Choice({ option, selected, onSelect }) {
@@ -259,7 +264,7 @@ export default function ControlPanel({
   const stock = wheelType === "stock";
 
   return (
-    <aside className="flex w-full shrink-0 flex-col border-t border-line-soft bg-panel lg:w-[360px] lg:border-t-0 lg:border-l">
+    <aside className="flex min-h-0 w-full shrink-0 flex-col border-t border-line-soft bg-panel lg:w-[360px] lg:border-t-0 lg:border-l">
 
       {/* HEADER */}
       <div className="border-b border-line-soft px-5 py-4">
@@ -269,7 +274,7 @@ export default function ControlPanel({
       </div>
 
       {/* TABS */}
-      <div className="grid shrink-0 grid-cols-5 gap-px border-b border-line-soft bg-line-soft">
+      <div className="grid shrink-0 grid-cols-6 gap-px border-b border-line-soft bg-line-soft">
         {TABS.map((entry) => (
           <button
             key={entry.id}
@@ -288,7 +293,11 @@ export default function ControlPanel({
       </div>
 
       {/* CONTENT */}
-      <div className="flex-1 overflow-y-auto px-5 py-6">
+      {/* min-h-0 is doing real work here. A flex child defaults to a minimum
+          height of its content, so without it this never shrinks, the scroll
+          never engages, and the tall footer below ends up drawn over the
+          bottom of whichever tab is open. */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6">
         {tab === "assistant" && <DesignAssistant onApply={onApplyTheme} />}
 
         {tab === "paint" && (
@@ -469,6 +478,20 @@ export default function ControlPanel({
           </div>
         )}
 
+        {tab === "share" && (
+          <div className="space-y-7">
+            <div>
+              <p className="label mb-3">See it where it would stand</p>
+              <ARView car={car} colour={color} />
+            </div>
+
+            <div>
+              <p className="label mb-3">Build it with someone else</p>
+              <LiveRoom live={live} room={room} onStart={startRoom} onLeave={leaveRoom} />
+            </div>
+          </div>
+        )}
+
         {tab === "extras" && (
           <div className="space-y-7">
             <div className="space-y-2">
@@ -617,14 +640,6 @@ export default function ControlPanel({
 
         <div className="mt-3">
           <SaveBuild buildPayload={buildPayload} onSaved={onSaved} />
-        </div>
-
-        <div className="mt-3">
-          <ARView car={car} colour={color} />
-        </div>
-
-        <div className="mt-3">
-          <LiveRoom live={live} room={room} onStart={startRoom} onLeave={leaveRoom} />
         </div>
 
         <Link to="/discover" className="btn btn-ghost mt-3 w-full">

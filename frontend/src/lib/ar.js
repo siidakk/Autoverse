@@ -38,16 +38,21 @@ export async function arAvailable() {
 export function unavailableBecause() {
   if (typeof navigator === "undefined") return "Not running in a browser";
 
-  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  if (ios) {
-    return "Safari does not support WebXR, so in-room AR is not available on iPhone or iPad. It works on Android in Chrome.";
+  if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+    return "Safari has no WebXR, so in-room AR cannot run on iPhone or iPad. It works on Android in Chrome.";
   }
 
-  if (!navigator.xr) {
-    return "This browser has no WebXR. On Android, Chrome supports it; on a laptop there is usually no camera pose to place anything against.";
-  }
+  // A laptop is the common case, and "no support" is a useless thing to tell
+  // someone sitting at one. What they need to know is that this is a phone
+  // feature and how to get it onto theirs.
+  return "AR needs a phone or tablet that can track the room. Open this same build on an Android phone in Chrome and the button will work there.";
+}
 
-  return "This device reports no augmented reality support.";
+// Whether the reason is "wrong device" rather than "broken", which decides
+// whether offering a way onto a phone makes any sense.
+export function isDeviceLimitation() {
+  if (typeof navigator === "undefined") return false;
+  return !/Android/i.test(navigator.userAgent) || !navigator.xr;
 }
 
 function paint(scene, colour) {
