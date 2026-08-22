@@ -4,19 +4,35 @@
 
 Writes into frontend/public/models/damage/, which is served as a static file
 like the cars are, so the first scan does not wait on someone else's CDN. The
-detector already on the photo page does, and it costs a minute on a cold visit.
+object detector on the photo page does, and it costs about a minute on a cold
+visit.
 
-Needs the converter, which is not in requirements.txt because it drags in a
-large dependency tree that nothing else here wants:
+Install the converter with its dependencies skipped:
 
-    pip install tensorflowjs
+    pip install --no-deps tensorflowjs==4.22.0 tf_keras==2.18.0
+
+4.22 rather than the newest, to match @tensorflow/tfjs-converter in the
+frontend. `--no-deps` because the full dependency list does not install on
+Windows: it wants uvloop, which has no Windows build at all.
+
+Three of the converter's imports then have to be worked around, and all three
+are things this model does not use:
+
+  tensorflow_decision_forests  ships no Windows binary
+  tensorflow_hub               wants pkg_resources, which modern setuptools
+                               no longer provides
+  jax                          only needed to convert JAX models
+
+They are stubbed rather than installed. Keras is imported for real first,
+because it probes for jax itself and copes when jax is genuinely missing --
+it is only a half-built stub that confuses it.
 """
 
 import json
 import pathlib
 import shutil
-import subprocess
 import sys
+import types
 
 HERE = pathlib.Path(__file__).parent
 MODEL = HERE / "damage" / "savedmodel"
@@ -24,53 +40,56 @@ META = HERE / "damage" / "damage.json"
 OUT = HERE.parent / "frontend" / "public" / "models" / "damage"
 
 
+def load_converter():
+    """The converter, with the parts that do not build on Windows stubbed."""
+    import tensorflow  # noqa: F401
+    import keras.src.backend.tensorflow.trainer  # noqa: F401
+
+    for name in (
+        "tensorflow_decision_forests",
+        "tensorflow_hub",
+        "jax",
+        "jax.experimental",
+        "jax.experimental.jax2tf",
+    ):
+        stub = types.ModuleType(name)
+        stub.keras = types.SimpleNamespace(RandomForestModel=object)
+        stub.KerasLayer = object
+        stub.jax2tf = types.SimpleNamespace(convert=None)
+        sys.modules[name] = stub
+
+    from tensorflowjs.converters import tf_saved_model_conversion_v2
+
+    return tf_saved_model_conversion_v2
+
+
 def main():
     if not MODEL.exists():
         sys.exit(f"\n  No exported model at {MODEL}. Run train_damage.py first.\n")
 
     try:
-        import tensorflowjs  # noqa: F401
-    except ImportError:
+        convert = load_converter()
+    except ImportError as error:
         sys.exit(
-            "\n  The converter is missing. Install it with:\n\n"
-            "    pip install tensorflowjs\n\n"
-            "  It is kept out of requirements.txt because it pulls in a large\n"
-            "  dependency tree that only this one step needs.\n"
+            f"\n  The converter is not installed ({error}).\n\n"
+            "    pip install --no-deps tensorflowjs==4.22.0 tf_keras==2.18.0\n"
         )
 
     OUT.mkdir(parents=True, exist_ok=True)
 
-    print(f"\n  Converting {MODEL.name}")
+    print(f"\n  Converting {MODEL}")
 
-    # Run as a subprocess rather than through the Python API: the converter's
-    # own module has a habit of pinning versions against the installed
-    # TensorFlow, and the command line entry point reports that clearly
-    # instead of failing somewhere inside a graph rewrite.
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "tensorflowjs.converters.converter",
-            "--input_format=tf_saved_model",
-            "--output_format=tfjs_graph_model",
-            # Sixteen bit weights halve the download for a loss that does not
-            # show up in the held out numbers for a classifier this small.
-            "--quantize_float16=*",
-            str(MODEL),
-            str(OUT),
-        ],
-        capture_output=True,
-        text=True,
+    convert.convert_tf_saved_model(
+        str(MODEL),
+        str(OUT),
+        # Sixteen bit weights halve the download for a loss that does not show
+        # up in the held out numbers for a classifier this small.
+        quantization_dtype_map={"float16": "*"},
     )
 
-    if result.returncode != 0:
-        print(result.stdout)
-        print(result.stderr)
-        sys.exit("\n  Conversion failed.\n")
-
     # The labels and the measured accuracy travel with the weights, so the page
-    # can say how good the model is without that number being hardcoded in two
-    # places and drifting apart.
+    # can say how good the model is without that number being written down in
+    # two places and drifting apart.
     if META.exists():
         shutil.copy(META, OUT / "damage.json")
 

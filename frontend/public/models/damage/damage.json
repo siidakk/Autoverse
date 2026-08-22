@@ -1,0 +1,46 @@
+{
+  "classes": [
+    "crack",
+    "dent",
+    "glass_shatter",
+    "lamp_broken",
+    "scratch",
+    "tire_flat",
+    "undamaged"
+  ],
+  "imageSize": 224,
+  "accuracy": 0.8297,
+  "confidenceFloor": 0.8172,
+  "trainedOn": 6887,
+  "testedOn": 2026,
+  "perClass": {
+    "crack": {
+      "support": 96,
+      "recall": 0.646
+    },
+    "dent": {
+      "support": 352,
+      "recall": 0.716
+    },
+    "glass_shatter": {
+      "support": 95,
+      "recall": 0.968
+    },
+    "lamp_broken": {
+      "support": 99,
+      "recall": 0.859
+    },
+    "scratch": {
+      "support": 490,
+      "recall": 0.841
+    },
+    "tire_flat": {
+      "support": 45,
+      "recall": 0.978
+    },
+    "undamaged": {
+      "support": 849,
+      "recall": 0.865
+    }
+  }
+}

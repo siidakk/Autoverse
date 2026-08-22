@@ -33,8 +33,10 @@ which is why the costing still asks you to confirm severity.
 """
 
 import contextlib
+import hashlib
 import io
 import json
+import os
 import pathlib
 import sys
 
@@ -50,6 +52,13 @@ from sklearn.model_selection import train_test_split
 HERE = pathlib.Path(__file__).parent
 DATA = HERE / "data" / "damage"
 OUT = HERE / "damage"
+CACHE = HERE / "data" / "features.npz"
+
+# Pulling features out of ten thousand images is the long part of this, and it
+# will use every core it is given. On a laptop that means the machine stops
+# responding, which is exactly what happened the first time. Leaving two cores
+# free costs a few minutes and keeps the thing usable.
+SPARE_CORES = max(1, (os.cpu_count() or 4) - 2)
 
 IMAGE_SIZE = 224
 BATCH = 32
@@ -88,6 +97,17 @@ def load_paths():
         sys.exit("\n  Class folders exist but contain no images.\n")
 
     return classes, np.array(paths), np.array(labels)
+
+
+def limit_threads():
+    """Leave enough of the machine free that it stays usable."""
+    try:
+        tf.config.threading.set_intra_op_parallelism_threads(SPARE_CORES)
+        tf.config.threading.set_inter_op_parallelism_threads(2)
+    except RuntimeError:
+        # Thrown if TensorFlow has already built its thread pools, which is
+        # not worth failing the run over.
+        pass
 
 
 def build_backbone():
@@ -163,12 +183,43 @@ def main():
         f"{len(test_paths)} test, {len(classes)} classes"
     )
 
+    limit_threads()
     backbone = build_backbone()
 
-    print("\n  Extracting features (frozen backbone, so this happens once)")
-    train_features = embed(backbone, train_paths)
-    valid_features = embed(backbone, valid_paths)
-    test_features = embed(backbone, test_paths)
+    # The backbone is frozen, so a given image always produces the same
+    # numbers. They are cached to disk, keyed by exactly which files went in,
+    # because this is the part that takes the time and losing it to a crash
+    # halfway through is how the first attempt at this ended.
+    signature = hashlib.sha1(
+        "|".join(sorted(str(p) for p in paths)).encode("utf-8")
+    ).hexdigest()[:16]
+
+    cached = None
+    if CACHE.exists():
+        stored = np.load(CACHE, allow_pickle=False)
+        if str(stored["signature"]) == signature:
+            cached = stored
+
+    if cached is not None:
+        print(f"\n  Reusing cached features from {CACHE.name}")
+        train_features = cached["train"]
+        valid_features = cached["valid"]
+        test_features = cached["test"]
+    else:
+        print("\n  Extracting features (frozen backbone, so this happens once)")
+        train_features = embed(backbone, train_paths)
+        valid_features = embed(backbone, valid_paths)
+        test_features = embed(backbone, test_paths)
+
+        CACHE.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(
+            CACHE,
+            train=train_features,
+            valid=valid_features,
+            test=test_features,
+            signature=np.array(signature),
+        )
+        print(f"  Cached to {CACHE.name}")
 
     # Public damage sets are lopsided: scratches are everywhere and a flat
     # tyre is rare. Without this the model learns to answer "scratch".

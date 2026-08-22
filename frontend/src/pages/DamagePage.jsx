@@ -181,10 +181,11 @@ export default function DamagePage() {
           What will it cost, and is it worth fixing?
         </h1>
         <p className="mt-5 max-w-xl text-sm leading-relaxed text-fog">
-          A photo is scanned for areas that do not behave like smooth paint.
-          Confirm what they are and the repair is costed against what the car is
-          actually worth, so the question of whether to fix it before selling
-          gets a number rather than a shrug.
+          A photo is read by a classifier trained on several thousand
+          photographs of real damage, which names what it finds and says how
+          sure it is. Confirm it, and the repair is costed against what the car
+          is actually worth, so the question of whether to fix it before
+          selling gets a number rather than a shrug.
         </p>
         <div className="tick-rule mt-8 opacity-70" />
       </header>
