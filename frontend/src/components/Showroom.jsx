@@ -674,7 +674,7 @@ export default function Showroom() {
           ].join(" ")}
         >
           <div className="hud-frame h-full w-full">
-            <div className="absolute top-0 left-0">
+            <div className="absolute top-0 left-0 pl-6">
               <p className="readout text-lg tracking-tight">{selectedCar.name}</p>
               <p className="label mt-1">
                 {finish} · {wheelType} wheels

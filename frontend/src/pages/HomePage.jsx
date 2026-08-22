@@ -155,15 +155,21 @@ export default function HomePage() {
 
         <div className="relative mx-auto min-h-[100svh] max-w-[1500px] px-5 md:px-8">
 
-          {/* 3D LAYER */}
-          <div className="absolute inset-0 z-0">
+          {/* 3D LAYER
+              On a wide screen the car gets the right hand side to itself. It
+              used to span the whole hero, which put a Porsche directly behind
+              the words "change a thing" -- both fighting for the same pixels
+              and neither winning. On a phone there is no room to split, so it
+              stays full width behind the text with the gradient below doing
+              the work. */}
+          <div className="absolute inset-0 z-0 md:left-[38%]">
             <HeroScene car={activeCar} visible={showing} spin={!still} />
           </div>
 
           {/* Type has to stay readable over whatever colour the car is. Dark
               from the bottom on a phone, where the car sits behind the words;
               dark from the left on a wide screen, where it sits beside them. */}
-          <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-ink via-ink/75 to-transparent md:bg-gradient-to-r md:from-ink md:via-ink/70 md:to-transparent" />
+          <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-ink via-ink/75 to-transparent md:bg-gradient-to-r md:from-ink md:via-ink/55 md:to-transparent" />
 
           <HeroLoader />
 

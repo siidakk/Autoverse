@@ -33,3 +33,7 @@ backend/.data/
 # that the dataset does not own. None of it is redistributed from here.
 ml/data/
 ml/damage/
+
+# Deck QA renders, regenerated from the pptx whenever they are needed
+docs/render/
+docs/*.pdf

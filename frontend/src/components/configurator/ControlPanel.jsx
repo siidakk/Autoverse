@@ -23,7 +23,7 @@ import {
 } from "../../data/accessories";
 
 const TABS = [
-  { id: "assistant", label: "Assistant" },
+  { id: "assistant", label: "Assist" },
   { id: "paint", label: "Paint" },
   { id: "wheels", label: "Wheels" },
   { id: "body", label: "Body" },
@@ -282,7 +282,7 @@ export default function ControlPanel({
             type="button"
             onClick={() => setTab(entry.id)}
             className={[
-              "py-3 text-[11px] tracking-widest uppercase transition-colors",
+              "px-1 py-3 text-[9px] tracking-[0.12em] uppercase transition-colors",
               tab === entry.id
                 ? "bg-panel text-signal"
                 : "bg-ink text-fog hover:text-chalk"
