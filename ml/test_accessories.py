@@ -12,9 +12,11 @@ So the checks here are mostly about a *set* of results rather than about one.
 
 import sys
 
-import joblib
-
 from accessories import accessories_for
+# Imported for the real ranking rather than an approximation of it. This does
+# load the service's models, which is slow, but a test that checks the variety
+# of a page of results has to be looking at the page that gets served.
+from app import catalogue, preferences_from, rank
 
 GREEN, RED, DIM, OFF = "\x1b[32m", "\x1b[31m", "\x1b[2m", "\x1b[0m"
 
@@ -26,18 +28,34 @@ def check(passed, message):
         problems.append(message)
 
 
-catalogue = joblib.load("recommender.pkl")["catalogue"]
-
-
 def signature(picks):
     return tuple((pick["category"], str(pick["value"])) for pick in picks)
 
 
+def shape(row):
+    """How different two cars actually are, along the axes the module may use.
+
+    This is deliberately not the same code as accessories.py -- it is a second,
+    coarser opinion about what makes cars different, so that "the suggestions
+    varied" cannot be satisfied by the suggestions simply disagreeing with
+    themselves.
+    """
+    power = float(row["power"])
+
+    return (
+        row["body"],
+        sum(power >= threshold for threshold in (80, 110, 145, 200)),
+        float(row["length_mm"] or 0) >= 3800,
+        "Petrol" in row["fuels"],
+        int(row["seats"]) >= 7,
+    )
+
+
 def top(budget, **prefs):
-    """Roughly what the recommender would return: affordable, best matches."""
-    rows = catalogue[catalogue["price"] <= budget * 1.05]
-    rows = rows.sort_values("popularity", ascending=False).head(5)
-    return [(row, accessories_for(row, {"budget": budget, "seats": 5, **prefs})) for _, row in rows.iterrows()]
+    """Exactly what a search for this would put on the page."""
+    preferences = preferences_from({"budget": budget, "seats": 5, **prefs})
+    _, shortlist = rank(preferences)
+    return [(row, accessories_for(row, preferences)) for _, row in shortlist.iterrows()]
 
 
 print()
@@ -70,14 +88,30 @@ searches = [
 for name, budget, prefs in searches:
     results = top(budget, **prefs)
     distinct = {signature(picks) for _, picks in results}
+    shapes = {shape(row) for row, _ in results}
 
-    # Three out of five is the bar. Demanding five would be dishonest: two cars
-    # with the same body and the same output should get the same parts.
+    # The bar is how different the cars themselves are, not a flat number.
+    #
+    # A flat three-out-of-five was the first attempt and it was wrong at the
+    # cheap end of this market: a seven lakh city search returns five sub-four
+    # metre petrol hatchbacks, four of them within five bhp of each other and
+    # three of them the same Maruti platform in different clothes. Demanding
+    # that an Alto K10 and an S-Presso be given different modifications is
+    # demanding invented difference, which is the failure this file exists to
+    # catch, only pointing the other way.
+    #
+    # So: as many distinct suggestion sets as there are genuinely distinct
+    # cars, capped at three, because past that the four-pick limit on a card
+    # starts hiding differences that really are there.
+    expected = min(len(shapes), 3)
+
     check(
-        len(distinct) >= 3,
-        f"{name}: {len(results)} results produced only {len(distinct)} distinct sets"
+        len(distinct) >= expected,
+        f"{name}: {len(shapes)} genuinely different cars produced "
+        f"only {len(distinct)} distinct sets"
     )
-    print(f"  {GREEN}{len(distinct)}/{len(results)} distinct{OFF} {DIM}{name}{OFF}")
+    print(f"  {GREEN}{len(distinct)} sets{OFF} for {len(shapes)} kinds of car "
+          f"{DIM}({len(results)} results, {name}){OFF}")
 
 # --- suggestions must follow the car, not only the question ---------------
 prefs = {"priority": "value", "driving": "calm", "usage": "city", "seats": 5, "budget": 5000000}

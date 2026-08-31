@@ -16,6 +16,20 @@ const VERDICTS = {
   over: { label: "Priced over", tone: "text-signal" }
 };
 
+// Economy, in whichever unit this car actually has one.
+//
+// Three cases, and the third is the reason this is a function. A petrol car
+// has kmpl; an electric one has km/kWh and never had a kmpl; and a third of
+// the catalogue has no published figure at all, which used to arrive here as a
+// zero and get printed, in good faith, as "0 kmpl". The dataset is explicit
+// that a missing field means unverified rather than zero, so an em dash is the
+// honest thing to show.
+const economy = (car) => {
+  if (car.mileage) return `${car.mileage} kmpl`;
+  if (car.kmPerKwh) return `${car.kmPerKwh} km/kWh`;
+  return "—";
+};
+
 // The parts the recommender suggests, pointed at the configurator so a
 // suggestion can be looked at rather than just read.
 function Accessories({ items }) {
@@ -84,8 +98,10 @@ function ResultCard({ car, index }) {
       <dl className="mt-5 grid grid-cols-4 gap-3">
         {[
           ["Power", `${car.power} bhp`],
-          ["Engine", `${car.engine} cc`],
-          ["Economy", `${car.mileage} kmpl`],
+          // An electric motor has no displacement, so the cell says so rather
+          // than claiming nought cc.
+          ["Engine", car.engine ? `${car.engine} cc` : "Electric"],
+          ["Economy", economy(car)],
           ["Seats", car.seats]
         ].map(([label, value]) => (
           <div key={label}>
@@ -139,7 +155,7 @@ export default function RecommendPage() {
           Tell it how you drive.
         </h1>
         <p className="mt-5 max-w-xl text-sm leading-relaxed text-fog">
-          Content based filtering over 166 models from the Indian used market.
+          Content based filtering over every car on sale in India today.
           Anything that cannot work is filtered out first, then what remains is
           ranked against what you asked for. Every result says why it is there.
         </p>

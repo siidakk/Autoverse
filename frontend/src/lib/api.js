@@ -38,6 +38,26 @@ export async function recommend(preferences) {
   }
 }
 
+// What the recommender actually holds: the fuels, bodies and seat counts that
+// exist in the catalogue, plus who the data belongs to.
+//
+// Worth fetching rather than hard coding, as the last change proved. The form
+// had a fixed list written when the data was a scrape of 2020 used listings,
+// so it went on offering LPG, which nothing in the new catalogue is, and had
+// no way at all to ask for Electric or Hybrid, which twenty seven and eight of
+// them are. A list of options that disagrees with the data is a search that
+// returns nothing for no visible reason.
+export async function catalogueMeta() {
+  try {
+    const { data } = await axios.get(`${mlBaseUrl}/meta`, { timeout: 90000 });
+    return data;
+  } catch {
+    // The page has sensible defaults and this only ever enriches them, so a
+    // sleeping service should not stop anybody searching.
+    return null;
+  }
+}
+
 // Valuation takes the same route as recommendations: API first, recommender
 // directly if the API cannot be reached.
 export async function valuationOptions() {

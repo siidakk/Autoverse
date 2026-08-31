@@ -22,7 +22,7 @@ export const SECTIONS = [
     to: "/discover",
     label: "Discover",
     blurb: "Find the right car for your budget",
-    kicker: "166 Indian models, matched on what you need",
+    kicker: "Every car on sale in India, matched on what you need",
     was: "/recommend"
   },
   {

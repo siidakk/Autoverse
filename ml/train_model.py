@@ -1,188 +1,55 @@
-"""Builds the recommendation artefacts from the Indian market listings.
+"""Builds the recommendation artefacts from the new-car catalogue.
 
-The previous model scored cars with a hand written formula and then trained a
-regressor to predict that same formula from three of its own terms, which taught
-it arithmetic rather than preference. Ranking by nearest score also meant two
-unrelated cars could tie, which is how a query for a coupe came back with a
-pickup.
+An earlier version scored cars with a hand written formula and then trained a
+regressor to predict that same formula from three of its own terms, which
+taught it arithmetic rather than preference. Ranking by nearest score also
+meant two unrelated cars could tie, which is how a query for a coupe came back
+with a pickup.
 
 This builds two things instead:
 
-  * a catalogue of one row per model, aggregated from the listings, with a body
-    style and a segment worked out from the name and the price
-  * a nearest neighbour index over the specs that a buyer actually states a
+  * a nearest neighbour index over the specs a buyer actually states a
     preference about, which is content based filtering
+  * a price model, which is what lets a recommendation say whether a car is
+    priced well for what it is
 
-A price model is trained alongside it. It is what lets a recommendation say
-whether a car is priced above or below what its specification is worth, and it
-is the same model Phase 7 needs for resale estimates.
+The table underneath both used to be aggregated from used listings whose newest
+car was a 2020. It now comes from build_catalogue.py: real, current, on-sale
+cars. The listings did not go away, they went to listings.py, because resale
+valuation genuinely needs them and a manufacturer's price list cannot answer
+what a six year old hatchback is worth.
 
     python train_model.py
 """
 
-import re
-
 import joblib
 import numpy as np
-import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error, r2_score
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score
+from sklearn.model_selection import KFold, cross_val_predict
 from sklearn.neighbors import NearestNeighbors
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-DATA = "cars_india.csv"
-LATEST_YEAR = 2020  # the newest listings in this dataset
-
-# Body style cannot be read off a column here, so it comes from the model name.
-# Anything unmatched falls back to a guess from how many seats it has.
-BODY_KEYWORDS = {
-    "SUV": [
-        "fortuner", "creta", "seltos", "scorpio", "xuv", "duster", "ecosport",
-        "brezza", "venue", "harrier", "safari", "endeavour", "compass", "thar",
-        "bolero", "tucson", "captur", "hexa", "terrano", "kicks", "gurkha",
-        "pajero", "rexton", "land cruiser", "wrangler", "sportage", "santa fe",
-        "innova", "carnival", "quanto", "nuvosport", "tuv",
-        # Premium badges name their SUVs by letter, so they need listing too or
-        # a BMW X1 comes back filed as a saloon.
-        "x1", "x3", "x5", "x6", "q3", "q5", "q7", "gla", "glc", "gle", "gls",
-        "ml-class", "discovery", "evoque", "range rover", "xc60", "xc90", "kodiaq"
-    ],
-    "Sedan": [
-        "city", "verna", "ciaz", "dzire", "amaze", "vento", "rapid", "octavia",
-        "corolla", "altis", "sunny", "fiesta", "linea", "manza", "zest",
-        "aspire", "xcent", "tigor", "accent", "esteem", "lancer", "civic",
-        "elantra", "jetta", "passat", "camry", "superb", "accord", "fluidic",
-        "sx4", "logan", "verito", "etios", "yaris", "slavia", "virtus"
-    ],
-    "Hatchback": [
-        "swift", "i10", "i20", "alto", "wagon r", "santro", "celerio", "tiago",
-        "polo", "figo", "beat", "kwid", "baleno", "jazz", "brio", "micra",
-        "pulse", "grande", "ritz", "zen", "800", "eon", "redi", "spark",
-        "getz", "indica", "bolt", "punto", "estilo", "a-star", "nano", "go"
-    ],
-    "Pickup": ["hilux", "dost", "bolero pickup", "isuzu", "d-max"],
-    "MPV": ["ertiga", "marazzo", "triber", "lodgy", "enjoy", "omni", "eeco", "sumo"],
-    "Luxury": [
-        "bmw", "mercedes", "audi", "jaguar", "volvo", "lexus", "porsche",
-        "land rover", "mini", "bentley"
-    ]
-}
-
-PREMIUM_BRANDS = {
-    "BMW", "Mercedes-Benz", "Audi", "Jaguar", "Volvo", "Lexus", "Porsche",
-    "Land", "Mini", "Bentley", "Isuzu"
-}
-
-
-def to_number(value):
-    """Pull the leading number out of fields like '74 bhp' or '1248 CC'."""
-    if pd.isna(value):
-        return np.nan
-    match = re.search(r"[\d.]+", str(value))
-    return float(match.group()) if match else np.nan
-
-
-def body_style(name, seats):
-    lowered = name.lower()
-
-    for style, keywords in BODY_KEYWORDS.items():
-        if style == "Luxury":
-            continue
-        if any(keyword in lowered for keyword in keywords):
-            return style
-
-    # Nothing matched, so fall back on capacity.
-    if seats >= 7:
-        return "MPV"
-    return "Hatchback" if seats <= 4 else "Sedan"
-
-
-def segment(brand, price):
-    """What kind of buy this is, which is what "luxury or sporty" really asks."""
-    if brand in PREMIUM_BRANDS or price >= 2_000_000:
-        return "Luxury"
-    if price >= 900_000:
-        return "Premium"
-    if price >= 450_000:
-        return "Mid"
-    return "Budget"
-
-
-def load_listings():
-    df = pd.read_csv(DATA)
-
-    df["engine"] = df["engine"].apply(to_number)
-    df["max_power"] = df["max_power"].apply(to_number)
-    df["mileage_kmpl"] = df["mileage_kmpl"].apply(to_number)
-
-    df = df.dropna(
-        subset=["engine", "max_power", "mileage_kmpl", "seats", "selling_price"]
-    )
-
-    df["brand"] = df["name"].str.split().str[0]
-    # Two words is enough to separate a Swift from a Swift Dzire without
-    # splitting every trim into its own entry, except where the second word is
-    # only a qualifier and the name proper is the third: Hyundai Elite i20.
-    qualifiers = {"new", "elite", "grand", "next", "all", "the"}
-    df["model"] = df["name"].apply(
-        lambda name: " ".join(
-            name.split()[:3]
-            if len(name.split()) > 2 and name.split()[1].lower() in qualifiers
-            else name.split()[:2]
-        )
-    )
-    df["age"] = LATEST_YEAR - df["year"]
-
-    return df[df["age"] >= 0]
-
-
-def build_catalogue(listings):
-    """One row per model, so the same car cannot fill the results five times."""
-    grouped = listings.groupby(["brand", "model"], as_index=False).agg(
-        price=("selling_price", "median"),
-        price_low=("selling_price", lambda s: s.quantile(0.15)),
-        price_high=("selling_price", lambda s: s.quantile(0.85)),
-        power=("max_power", "median"),
-        # Not named `engine`: that is a reserved argument of agg() and the
-        # aggregation is silently dropped instead of failing.
-        engine_cc=("engine", "median"),
-        mileage=("mileage_kmpl", "median"),
-        seats=("seats", "median"),
-        year=("year", "max"),
-        # The typical age of the cars this price came from. Valuing the model
-        # against its newest listing while quoting the median price of all of
-        # them compares two different cars and calls everything a bargain.
-        year_typical=("year", "median"),
-        listings=("selling_price", "size"),
-        fuels=("fuel", lambda s: sorted(set(s))),
-        transmissions=("transmission", lambda s: sorted(set(s))),
-    )
-
-    # A model seen twice is noise, not a catalogue entry.
-    grouped = grouped[grouped["listings"] >= 3].reset_index(drop=True)
-
-    grouped["seats"] = grouped["seats"].round().astype(int)
-    grouped["body"] = [
-        body_style(name, seats)
-        for name, seats in zip(grouped["model"], grouped["seats"])
-    ]
-    grouped["segment"] = [
-        segment(brand, price)
-        for brand, price in zip(grouped["brand"], grouped["price"])
-    ]
-
-    # Popularity, as a share of the most listed model. Stands in for the
-    # interaction data a collaborative filter would need and does not have yet.
-    grouped["popularity"] = grouped["listings"] / grouped["listings"].max()
-
-    return grouped
-
+from build_catalogue import ATTRIBUTION, build as new_catalogue
 
 # The axes a buyer actually expresses a preference along.
-FEATURES = ["price", "power", "mileage", "seats", "engine_cc"]
+#
+# Economy is running cost rather than kmpl. An electric car has no kmpl at all,
+# so with the old feature every one of the twenty seven in this catalogue was
+# imputed to the market average and none of them could ever rank as frugal --
+# which is precisely backwards. Rupees a kilometre is the one axis a petrol, a
+# diesel, a CNG and an electric car can all be put on. Note that it runs the
+# other way: on this feature, lower is better.
+FEATURES = ["price", "power", "cost_per_km_ranked", "seats", "engine_cc"]
+
+# What a specification is worth is judged on the published figures plus the two
+# dimensions that decide how much car you are getting for the money.
+PRICE_FEATURES = [
+    "power", "engine_cc", "mileage_ranked", "cost_per_km_ranked", "seats",
+    "length_mm", "boot_litres", "fuel", "transmission", "body",
+]
 
 
 def build_index(catalogue):
@@ -195,61 +62,75 @@ def build_index(catalogue):
     return scaler, index, matrix
 
 
-def train_price_model(listings):
-    """Predicts what a listing should cost, given the car and its condition."""
-    features = [
-        "max_power", "engine", "mileage_kmpl", "seats", "age", "km_driven",
-        "fuel", "transmission", "owner", "seller_type"
-    ]
+def train_price_model(catalogue):
+    """What a specification is worth, judged against the rest of the market.
 
-    X = listings[features]
-    y = np.log1p(listings["selling_price"])  # prices span three orders of magnitude
+    On used listings this asked whether a seller was asking too much. On a new
+    car the price is the manufacturer's, so the same model answers a more
+    useful question: is this well priced for what it is, next to everything
+    else on sale.
+    """
+    frame = catalogue.copy()
+    frame["fuel"] = frame["fuels"].apply(lambda values: values[0])
+    frame["transmission"] = frame["transmissions"].apply(lambda values: values[0])
 
-    categorical = ["fuel", "transmission", "owner", "seller_type"]
+    X = frame[PRICE_FEATURES]
+    y = np.log1p(frame["price"])  # prices span three orders of magnitude
+
+    categorical = ["fuel", "transmission", "body"]
 
     model = Pipeline([
         ("prepare", ColumnTransformer(
             [("categorical", OneHotEncoder(handle_unknown="ignore"), categorical)],
             remainder="passthrough"
         )),
-        # Sized for a free tier. Two hundred trees left unpruned come to fifty
-        # megabytes on disk and score 0.942; sixty trees with a larger leaf come
-        # to under three and score 0.940, which is not a difference worth half a
-        # gigabyte of memory at boot.
+        # Sized for a catalogue of a hundred and twenty rather than for tens of
+        # thousands of listings: a bigger forest with smaller leaves would
+        # memorise this table rather than learn the shape of the market.
         ("forest", RandomForestRegressor(
-            n_estimators=60, min_samples_leaf=3, random_state=42, n_jobs=-1
+            n_estimators=300, min_samples_leaf=2, random_state=42, n_jobs=-1
         ))
     ])
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+    # A hundred and twenty rows leaves a twenty four row test set, which is far
+    # too small to quote: the same model scored 0.824 or 0.832 depending only
+    # on which rows happened to fall where. Cross validation predicts every row
+    # exactly once, from a model that never saw it.
+    predicted = cross_val_predict(
+        model, X, y, cv=KFold(5, shuffle=True, random_state=42)
     )
 
-    model.fit(X_train, y_train)
+    actual = np.expm1(y)
+    guess = np.expm1(predicted)
+    error = np.abs(guess - actual) / actual
 
-    predicted = model.predict(X_test)
-    rupees = np.expm1(predicted)
-    actual = np.expm1(y_test)
+    print("\nPRICE MODEL  (what a specification is worth on the new market)")
+    print(f"  R2 on log price : {r2_score(y, predicted):.3f}")
+    # The median, because the mean is decided by a handful of cars that have no
+    # peers: a Land Cruiser at 221 lakh has nothing in the table to learn from,
+    # and one of those drags an average wherever it likes.
+    print(f"  Median error    : {np.median(error):.1%}")
+    print(f"  Within 20%      : {(error <= 0.20).mean():.0%} of models")
+    print(f"  Within 35%      : {(error <= 0.35).mean():.0%} of models")
 
-    print("\nPRICE MODEL")
-    print(f"  R2 on log price : {r2_score(y_test, predicted):.3f}")
-    print(f"  Mean error      : Rs {mean_absolute_error(actual, rupees):,.0f}")
-    print(f"  Median price    : Rs {actual.median():,.0f}")
-
+    model.fit(X, y)
     return model
 
 
 def main():
-    listings = load_listings()
-    print(f"Listings after cleaning : {len(listings):,}")
+    catalogue, as_of = new_catalogue()
 
-    catalogue = build_catalogue(listings)
+    known = int(catalogue["economy_known"].sum())
+
+    print(f"Catalogue dated         : {as_of}")
     print(f"Models in the catalogue : {len(catalogue):,}")
     print(f"Body styles             : {dict(catalogue['body'].value_counts())}")
     print(f"Segments                : {dict(catalogue['segment'].value_counts())}")
+    print(f"Published an economy fig: {known}/{len(catalogue)} "
+          f"(the rest are ranked on the peer median and shown blank)")
 
     scaler, index, matrix = build_index(catalogue)
-    price_model = train_price_model(listings)
+    price_model = train_price_model(catalogue)
 
     joblib.dump(
         {
@@ -258,7 +139,8 @@ def main():
             "index": index,
             "matrix": matrix,
             "features": FEATURES,
-            "latest_year": LATEST_YEAR,
+            "source": ATTRIBUTION,
+            "as_of": as_of,
         },
         "recommender.pkl",
         compress=3,

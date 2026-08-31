@@ -40,3 +40,7 @@ docs/*.pdf
 
 # Office lock files, left behind while a document is open
 ~$*
+
+# Intermediate output of build_catalogue.py run on its own. The real
+# artefacts are recommender.pkl and price_model.pkl.
+ml/catalogue_new.pkl

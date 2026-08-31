@@ -145,7 +145,15 @@ export default function ValuationPage() {
 
               {car && (
                 <p className="readout text-[10px] text-fog">
-                  {car.power} bhp · {car.engine} cc · {car.mileage} kmpl · {car.seats} seats
+                  {car.power} bhp · {car.engine ? `${car.engine} cc` : "electric"} ·{" "}
+                  {/* The valuation model needs an economy figure for every car,
+                      so an unpublished one is filled in from the car's peers.
+                      The tilde is there so an estimate is never mistaken for a
+                      manufacturer's number. */}
+                  <span title={car.mileageKnown ? undefined : "Estimated from similar cars — the maker never published one"}>
+                    {car.mileageKnown ? "" : "~"}{car.mileage} kmpl
+                  </span>{" "}
+                  · {car.seats} seats
                 </p>
               )}
 

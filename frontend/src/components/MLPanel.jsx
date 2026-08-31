@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { recommend, apiBaseUrl } from "../lib/api";
+import { recommend, catalogueMeta, apiBaseUrl } from "../lib/api";
 
 // What a buyer can actually say about themselves. The old form asked for
 // horsepower and highway mpg, which is the answer, not the question.
@@ -14,7 +14,10 @@ const BUDGETS = [
   { value: 4000000, label: "40L" }
 ];
 
-const FUELS = ["any", "Petrol", "Diesel", "CNG", "LPG"];
+// Defaults only. The real lists come from the catalogue itself on mount --
+// see catalogueMeta -- because a hard coded list drifts away from the data
+// the moment the data changes, and then quietly returns nothing.
+const FUELS = ["any", "Petrol", "Diesel", "CNG", "Electric", "Hybrid"];
 const SEATS = [4, 5, 6, 7, 8];
 const BODIES = ["any", "Hatchback", "Sedan", "SUV", "MPV"];
 
@@ -92,12 +95,28 @@ export default function MLPanel({ onResults }) {
   const [usage, setUsage] = useState("mixed");
   const [priority, setPriority] = useState("balanced");
 
+  // Filled in from the service once it answers; until then the defaults
+  // above are shown, so the form works while the free tier wakes up.
+  const [meta, setMeta] = useState(null);
+
   const [loading, setLoading] = useState(false);
   const [slow, setSlow] = useState(false);
   const [error, setError] = useState(null);
 
   const slowTimer = useRef(null);
   useEffect(() => () => window.clearTimeout(slowTimer.current), []);
+
+  useEffect(() => {
+    let live = true;
+    catalogueMeta().then((data) => live && data && setMeta(data));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const fuels = meta ? ["any", ...meta.fuels] : FUELS;
+  const bodies = meta ? ["any", ...meta.bodies] : BODIES;
+  const seatCounts = meta?.seats?.length ? meta.seats : SEATS;
 
   const run = async () => {
     setLoading(true);
@@ -153,12 +172,12 @@ export default function MLPanel({ onResults }) {
         </Field>
 
         <Field label="Fuel">
-          <Segmented options={FUELS} value={fuel} onChange={setFuel} columns={5} />
+          <Segmented options={fuels} value={fuel} onChange={setFuel} columns={4} />
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Seats needed">
-            <Segmented options={SEATS} value={seats} onChange={setSeats} columns={5} />
+            <Segmented options={seatCounts} value={seats} onChange={setSeats} columns={5} />
           </Field>
 
           <Field label="Gearbox">
@@ -172,7 +191,7 @@ export default function MLPanel({ onResults }) {
         </div>
 
         <Field label="Body">
-          <Segmented options={BODIES} value={body} onChange={setBody} columns={5} />
+          <Segmented options={bodies} value={body} onChange={setBody} columns={4} />
         </Field>
 
         <Field label="How you drive">
@@ -214,6 +233,35 @@ export default function MLPanel({ onResults }) {
           <p className="label text-signal">Request failed</p>
           <p className="mt-2 text-xs leading-relaxed text-fog">{error}</p>
         </div>
+      )}
+
+      {/* Not decoration: the catalogue is CC BY 4.0 and the licence is only
+          honoured if the credit is actually shown to whoever reads the data.
+          It doubles as the honest statement of how current the answers are. */}
+      {meta && (
+        <p className="readout mt-6 border-t border-line-soft pt-4 text-[10px] leading-relaxed text-fog">
+          Searching {meta.models} cars on sale, catalogue dated {meta.asOf}.
+          <br />
+          Specifications from{" "}
+          <a
+            href="https://variantwise.com"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-chalk underline decoration-line underline-offset-2"
+          >
+            VariantWise
+          </a>
+          , used under{" "}
+          <a
+            href="https://creativecommons.org/licenses/by/4.0/"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-chalk underline decoration-line underline-offset-2"
+          >
+            CC BY 4.0
+          </a>
+          .
+        </p>
       )}
     </div>
   );

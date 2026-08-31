@@ -1,6 +1,6 @@
 import { cars } from "./cars";
 
-// The recommender knows 166 real cars. The garage holds fifteen models. Rather
+// The recommender knows 120 real cars. The garage holds fifteen models. Rather
 // than let a recommendation end in a dead end, each one is pointed at the
 // closest thing that can actually be configured, and is honest about it being
 // the closest rather than the same car.

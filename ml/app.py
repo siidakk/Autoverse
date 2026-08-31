@@ -10,6 +10,7 @@ built out of the stated preferences. Every result carries the reasons it was
 picked, because a recommendation nobody can question is not much use.
 """
 
+import math
 from pathlib import Path
 
 import joblib
@@ -27,7 +28,10 @@ valuation = joblib.load(BASE_DIR / "valuation.pkl")
 catalogue = bundle["catalogue"]
 scaler = bundle["scaler"]
 FEATURES = bundle["features"]
-LATEST_YEAR = bundle["latest_year"]
+# The year range on the valuation form describes the used listings, so it comes
+# from that model's own bundle rather than from the new-car catalogue, which
+# only ever contains this year.
+LATEST_YEAR = valuation["latest_year"]
 
 from accessories import accessories_for
 
@@ -36,10 +40,14 @@ CORS(app)
 
 # How hard each preference pulls on the ranking. Budget dominates because it is
 # the one thing a buyer cannot bend.
+#
+# The economy axis is rupees a kilometre rather than kmpl, so that an electric
+# car can be compared with a diesel at all. It is the one feature here where a
+# lower number is the better one.
 WEIGHTS = {
     "price": 2.4,
     "power": 1.0,
-    "mileage": 1.0,
+    "cost_per_km_ranked": 1.0,
     "seats": 1.6,
     "engine_cc": 0.6,
 }
@@ -57,11 +65,30 @@ USAGE = {
 }
 
 PRIORITY = {
-    "value": {"price": 3.0, "mileage": 1.5},
+    "value": {"price": 3.0, "cost_per_km_ranked": 1.5},
     "balanced": {},
-    "comfort": {"seats": 2.2, "mileage": 0.8},
-    "performance": {"power": 2.4, "engine_cc": 1.4, "mileage": 0.4},
+    "comfort": {"seats": 2.2, "cost_per_km_ranked": 0.8},
+    "performance": {"power": 2.4, "engine_cc": 1.4, "cost_per_km_ranked": 0.4},
 }
+
+
+def number(value, digits=1):
+    """A figure, or None where the manufacturer never published one.
+
+    Two reasons this is not simply a float. The catalogue now carries real gaps
+    rather than zeros, and a gap has to reach the page as an absence so it can
+    be left blank instead of printed as "0 kmpl". And NaN is not valid JSON:
+    Flask writes it out bare and JSON.parse rejects the whole response, so one
+    unpublished economy figure would take the entire result set with it.
+    """
+    if value is None:
+        return None
+
+    figure = float(value)
+    if math.isnan(figure):
+        return None
+
+    return round(figure, digits)
 
 
 def rupees(value):
@@ -77,15 +104,16 @@ def build_target(preferences):
     power_target = span.quantile(style["power"])
     engine_target = catalogue["engine_cc"].quantile(style["engine"])
 
-    # Wanting economy means wanting a high number, so the quantile is inverted.
-    mileage_pull = min(0.95, 0.45 * USAGE[preferences["usage"]] * style["mileage"])
-    mileage_target = catalogue["mileage"].quantile(mileage_pull)
+    # Caring about economy means wanting a low running cost, so the harder the
+    # pull the further *down* the cost distribution the target sits.
+    economy_pull = min(0.95, 0.45 * USAGE[preferences["usage"]] * style["mileage"])
+    cost_target = catalogue["cost_per_km_ranked"].quantile(1 - economy_pull)
 
     return pd.DataFrame([{
         # People buy near the top of what they will spend, not at the bottom.
         "price": budget * 0.85,
         "power": power_target,
-        "mileage": mileage_target,
+        "cost_per_km_ranked": cost_target,
         "seats": preferences["seats"],
         "engine_cc": engine_target,
     }])[FEATURES]
@@ -125,21 +153,25 @@ def weights_for(preferences):
 
 
 def fair_price(row):
-    """What the price model thinks this specification is worth, well kept."""
+    """What this specification is worth next to the rest of the new market.
+
+    On used listings this asked whether a seller was asking too much. These are
+    manufacturer prices, so it answers the more useful question instead: is the
+    car well priced for what it is, compared with everything else on sale.
+    """
     frame = pd.DataFrame([{
-        "max_power": row["power"],
-        "engine": row["engine_cc"],
-        "mileage_kmpl": row["mileage"],
+        "power": row["power"],
+        "engine_cc": row["engine_cc"],
+        # The filled columns, not the published ones: the forest was trained on
+        # these and cannot take a NaN.
+        "mileage_ranked": row["mileage_ranked"],
+        "cost_per_km_ranked": row["cost_per_km_ranked"],
         "seats": row["seats"],
-        # Valued at the age these listings typically are, so the verdict
-        # compares like with like rather than pricing a new one against a
-        # median that includes ten year old cars.
-        "age": max(LATEST_YEAR - int(row["year_typical"]), 1),
-        "km_driven": 60000,
+        "length_mm": row.get("length_mm", 0),
+        "boot_litres": row.get("boot_litres", 0),
         "fuel": row["fuels"][0],
         "transmission": row["transmissions"][0],
-        "owner": "First Owner",
-        "seller_type": "Dealer",
+        "body": row["body"],
     }])
 
     return float(np.expm1(price_model.predict(frame)[0]))
@@ -162,12 +194,24 @@ def reasons_for(row, preferences):
     else:
         reasons.append(f"Seats {row['seats']}")
 
-    if preferences["usage"] == "city" and row["mileage"] >= 18:
-        reasons.append(f"{row['mileage']:.0f} kmpl in traffic")
-    elif preferences["priority"] == "performance":
+    # Whichever economy figure this car actually has. A third of them have no
+    # published kmpl, and the old code printed that gap as "0 kmpl" on the card.
+    economy = number(row["mileage"])
+    cost = number(row["cost_per_km"], 2)
+    electric = "Electric" in row["fuels"]
+
+    if preferences["priority"] == "performance":
         reasons.append(f"{row['power']:.0f} bhp")
-    else:
-        reasons.append(f"{row['mileage']:.0f} kmpl")
+    elif economy and preferences["usage"] == "city" and economy >= 18:
+        reasons.append(f"{economy:.0f} kmpl in traffic")
+    elif electric and cost:
+        reasons.append(f"About Rs {cost:.2f} a kilometre to run")
+    elif economy:
+        reasons.append(f"{economy:.0f} kmpl")
+    elif cost:
+        reasons.append(f"About Rs {cost:.2f} a kilometre to run")
+    # And if it has neither, it gets one reason fewer. Saying nothing is
+    # better than saying nought.
 
     if row["popularity"] >= 0.25:
         reasons.append("Commonly owned, parts are easy")
@@ -191,13 +235,16 @@ def meta():
         "seats": sorted(int(seat) for seat in catalogue["seats"].unique()),
         "priceRange": [rupees(catalogue["price"].min()), rupees(catalogue["price"].max())],
         "models": int(len(catalogue)),
+        # The licence on this data asks for attribution wherever it is used, so
+        # the page is told who to credit rather than the credit being left to
+        # whoever remembers. See build_catalogue.py.
+        "source": bundle["source"],
+        "asOf": bundle["as_of"],
     })
 
 
-@app.route("/recommend", methods=["POST"])
-def recommend():
-    data = request.json or {}
-
+def preferences_from(data):
+    """Fill in and sanity check whatever the page sent."""
     preferences = {
         "budget": float(data.get("budget", 600000)),
         "fuel": data.get("fuel", "any"),
@@ -216,14 +263,21 @@ def recommend():
     if preferences["priority"] not in PRIORITY:
         preferences["priority"] = "balanced"
 
+    return preferences
+
+
+def rank(preferences, count=5):
+    """The shortlist, ranked. Returns everything eligible and the top slice.
+
+    Split out of the endpoint so the tests can check what the endpoint really
+    returns. They used to approximate it as "the most popular cars inside the
+    budget", which is a different query, and it meant a test about the variety
+    of a page of results was measuring a page nobody was ever shown.
+    """
     rows = eligible(preferences)
 
     if rows.empty:
-        return jsonify({
-            "results": [],
-            "message": "Nothing in the data fits that. Try raising the budget or "
-                       "asking for fewer seats."
-        })
+        return rows, rows
 
     # Content based filtering: distance from the ideal the preferences describe,
     # measured on standardised features so rupees cannot drown out seats.
@@ -238,7 +292,20 @@ def recommend():
     score = distance - rows["popularity"].to_numpy() * 0.35
 
     rows = rows.assign(distance=distance, score=score).sort_values("score")
-    top = rows.head(5)
+    return rows, rows.head(count)
+
+
+@app.route("/recommend", methods=["POST"])
+def recommend():
+    preferences = preferences_from(request.json or {})
+    rows, top = rank(preferences)
+
+    if rows.empty:
+        return jsonify({
+            "results": [],
+            "message": "Nothing in the data fits that. Try raising the budget or "
+                       "asking for fewer seats."
+        })
 
     spread = float(max(top["score"].max() - top["score"].min(), 1e-6))
 
@@ -254,7 +321,10 @@ def recommend():
             "priceRange": [rupees(row["price_low"]), rupees(row["price_high"])],
             "power": round(float(row["power"]), 1),
             "engine": rupees(row["engine_cc"]),
-            "mileage": round(float(row["mileage"]), 1),
+            # Null where nothing was published, so the page can leave it blank.
+            "mileage": number(row["mileage"]),
+            "kmPerKwh": number(row["km_per_kwh"]),
+            "costPerKm": number(row["cost_per_km"], 2),
             "seats": int(row["seats"]),
             "body": row["body"],
             "segment": row["segment"],
@@ -305,7 +375,12 @@ def valuation_options():
                 "model": row["model"],
                 "power": round(float(row["power"]), 1),
                 "engine": int(row["engine_cc"]),
-                "mileage": round(float(row["mileage"]), 1),
+                # The filled figure, not the published one. This is a form
+                # default that gets fed to the valuation model, which needs a
+                # number for every car; `mileageKnown` is what says whether it
+                # came from the manufacturer or from the car's peers.
+                "mileage": round(float(row["mileage_ranked"]), 1),
+                "mileageKnown": bool(row["economy_known"]),
                 "seats": int(row["seats"]),
                 "fuels": list(row["fuels"]),
                 "transmissions": list(row["transmissions"]),

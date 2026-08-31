@@ -5,3 +5,8 @@ joblib==1.5.3
 pandas==3.0.1
 scikit-learn==1.8.0
 numpy==1.26.4
+
+# Serving only. Training additionally needs huggingface_hub, which fetches the
+# catalogue in build_catalogue.py -- deliberately not listed here, because the
+# service loads the pickles and never talks to Hugging Face, and the free tier
+# has half a gigabyte of memory to work with.

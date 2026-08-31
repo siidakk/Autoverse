@@ -18,6 +18,8 @@ rim" is a claim someone can disagree with, which is the point -- the alternative
 is a recommendation nobody can argue with because it never says why.
 """
 
+from math import isnan
+
 
 def _tier(value, thresholds):
     """How far up a ladder a value sits. Returns 0 for below the first rung."""
@@ -31,12 +33,26 @@ def _tier(value, thresholds):
 def accessories_for(row, preferences):
     power = float(row["power"])
     engine_cc = float(row["engine_cc"])
-    economy = float(row["mileage"])
     price = float(row["price"])
     seats = int(row["seats"])
     body = row["body"]
     segment = row["segment"]
     fuels = list(row["fuels"])
+    length_mm = float(row.get("length_mm") or 0)
+
+    # Two economy figures, and the difference matters. `published` is what the
+    # manufacturer actually filed and is NaN for a third of this catalogue;
+    # `economy` is that gap filled in from the car's peers. Decisions are made
+    # on the estimate, because otherwise every car with a missing figure fell
+    # through to the same generic advice and a page of budget hatchbacks came
+    # back reading identically -- which is the exact complaint this module was
+    # written to fix. Numbers are only ever *quoted* from `published`, so an
+    # estimate can steer a suggestion but can never be stated as fact.
+    published = float(row["mileage"])
+    known = not isnan(published)
+    economy = float(row.get("mileage_ranked", published))
+    if isnan(economy):
+        economy = 0.0
 
     # Specific output separates a willing small engine from a lazy big one,
     # which raw power alone does not: 88 bhp from 1.2 litres is a different
@@ -69,7 +85,8 @@ def accessories_for(row, preferences):
         picks.append({
             "category": "wheels",
             "value": "classic",
-            "why": f"{economy:.1f} kmpl — a steel rim keeps it that way"
+            "why": (f"{published:.1f} kmpl — a steel rim keeps it that way"
+                    if known else "Frugal enough that a steel rim is the honest choice")
         })
     elif premium:
         picks.append({
@@ -85,6 +102,13 @@ def accessories_for(row, preferences):
         })
 
     # ---- rim size ---------------------------------------------------------
+    # Plus-sizing keeps the overall diameter and trades sidewall for rim. That
+    # is a fair trade on a long car and a poor one on a short, light one, where
+    # the sidewall it spends is the only thing between the rim and a pothole.
+    # So length gets a say rather than power deciding on its own -- and it is a
+    # figure this catalogue publishes for every car, unlike economy.
+    roomy = length_mm >= 3800
+
     if pace >= 3:
         picks.append({
             "category": "wheelSize",
@@ -97,11 +121,20 @@ def accessories_for(row, preferences):
             "value": 2,
             "why": "One inch up, sidewall still usable"
         })
-    elif pace == 1 and not tall:
+    elif not tall and (pace == 1 or roomy):
         picks.append({
             "category": "wheelSize",
             "value": 2,
-            "why": f"{power:.0f} bhp carries one inch comfortably"
+            "why": (f"{power:.0f} bhp carries one inch comfortably" if pace == 1
+                    else f"{length_mm:.0f} mm of car has the arch for it")
+        })
+    elif not tall and length_mm:
+        # Advice to leave it alone is still advice, and on a car this short it
+        # is the right answer.
+        picks.append({
+            "category": "wheelSize",
+            "value": 1,
+            "why": f"Only {length_mm:.0f} mm long — that sidewall is worth keeping"
         })
 
     # ---- what the shape asks for ------------------------------------------
@@ -125,6 +158,33 @@ def accessories_for(row, preferences):
             "value": "sport",
             "why": "A lip on the boot is the subtle version of this"
         })
+
+    # ---- calipers ---------------------------------------------------------
+    # The cheapest visible modification there is, but only worth suggesting on
+    # a car whose wheels you can see through. A steel rim with a hubcap over it
+    # hides the brake entirely, so recommending a colour there would be selling
+    # somebody paint for a part nobody will ever look at.
+    wheel_choice = next((pick["value"] for pick in picks if pick["category"] == "wheels"), None)
+
+    if wheel_choice == "sport":
+        if power >= 200:
+            picks.append({
+                "category": "calipers",
+                "value": "#c0242c",
+                "why": f"Red, because {power:.0f} bhp has brakes worth showing"
+            })
+        elif premium:
+            picks.append({
+                "category": "calipers",
+                "value": "#1f2226",
+                "why": "Black hides the brake dust this segment generates"
+            })
+        else:
+            picks.append({
+                "category": "calipers",
+                "value": "#c0242c",
+                "why": "Red through an open spoke, for the price of a tin of paint"
+            })
 
     # ---- exhaust ----------------------------------------------------------
     # A diesel does not sound better through four tips, and pretending

@@ -24,7 +24,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from train_model import LATEST_YEAR, load_listings
+from listings import LATEST_YEAR, load_listings
 
 # What the roadmap asks a seller for, plus the specs that come with the car
 # once its model is known.
