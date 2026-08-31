@@ -385,6 +385,11 @@ def valuation_options():
                 "fuels": list(row["fuels"]),
                 "transmissions": list(row["transmissions"]),
                 "typical": rupees(row["price"]),
+                # Shape and size, so the repair page can narrow a photograph
+                # down to a few likely cars rather than making somebody scroll
+                # a list of a hundred and twenty to find their own.
+                "body": row["body"],
+                "length": int(row["length_mm"] or 0),
             }
             for _, row in known.iterrows()
         ],

@@ -11,6 +11,8 @@ import {
 } from "../lib/damage";
 import { valuationOptions, valueCar, describeError } from "../lib/api";
 import { scan as scanWithModel, modelInfo } from "../lib/damageModel";
+import { itemsFromScan, OPPOSITE_END } from "../lib/panels";
+import { likelyCars } from "../lib/carGuess";
 
 const rupees = (value) =>
   value >= 100000
@@ -31,6 +33,10 @@ export default function DamagePage() {
   const [items, setItems] = useState([
     { type: "scratch", severity: "moderate", panel: "door" }
   ]);
+
+  // What the last scan filled in on its own, so the page can say so. Null
+  // until a photo has actually been read.
+  const [filled, setFilled] = useState(null);
 
   const [options, setOptions] = useState(null);
   const [selected, setSelected] = useState("");
@@ -74,11 +80,51 @@ export default function DamagePage() {
 
   const cost = repairCost(items, segment);
 
+  // Fills in what a photograph can actually answer, and records what it filled
+  // so the page can be plain about which half to trust.
+  //
+  // The two halves are not equally reliable and it would be dishonest to
+  // present them as if they were. What the damage is, and which panel it sits
+  // on, comes from a classifier trained on photographs of damage and from the
+  // car's own outline. Which car it is, is inference from a body style and how
+  // much of the frame it fills -- nothing in this project can read a badge, so
+  // the name is a shortlist, not an identification.
+  const autoFill = (findings, carBox, imageSize, found) => {
+    const detected = itemsFromScan(findings ?? [], carBox, imageSize);
+
+    // Only replace what somebody may have typed if there is something to
+    // replace it with.
+    if (detected.length) setItems(detected);
+
+    // A body style is only worth ranking on when it came from the model
+    // trained to answer that question. The old bounding-box ratio guess is not
+    // evidence and must not be laundered into a car's name.
+    const body = found?.bodySource === "model" ? found.body : null;
+    const shareOfFrame = carBox ? carBox[2] / imageSize.width : null;
+
+    const candidates = options?.models?.length
+      ? likelyCars(options.models, { body, shareOfFrame })
+      : [];
+
+    if (candidates.length) {
+      setSelected(`${candidates[0].brand}|${candidates[0].model}`);
+    }
+
+    setFilled({
+      panels: detected.length,
+      unsure: detected.filter((item) => item.unsure),
+      candidates,
+      body,
+      colour: found?.colourName ?? null
+    });
+  };
+
   const scanPhoto = async () => {
     if (!imageRef.current) return;
 
     setScanError(null);
     setScan(null);
+    setFilled(null);
 
     const imageSize = {
       width: imageRef.current.naturalWidth,
@@ -86,7 +132,25 @@ export default function DamagePage() {
     };
 
     try {
-      // The trained classifier first. It only answers if someone has built it
+      // Finding the car comes first now, even when the trained classifier is
+      // going to do the reading. Damage has to be placed against the car's own
+      // outline to become a panel -- two thirds of the way down *the car* is a
+      // bumper, two thirds of the way down *the photograph* is anybody's guess
+      // -- and the same detection says how big the car is in frame, which is
+      // half of what narrows the photo down to a model.
+      //
+      // It costs a six megabyte download that the model path used to skip. A
+      // failure here is not fatal: without a car the photo becomes the frame.
+      let found = null;
+      try {
+        found = await inspectPhoto(imageRef.current, setStatus);
+      } catch {
+        // Detector unavailable — carry on with the whole frame.
+      }
+
+      const carBox = found?.found ? found.box : null;
+
+      // The trained classifier next. It only answers if someone has built it
       // and put it in public/models/damage; until then this returns nothing
       // and the measured version below still runs.
       const learned = await scanWithModel(imageRef.current, setStatus);
@@ -101,15 +165,19 @@ export default function DamagePage() {
             label: finding.label,
             confidence: finding.confidence
           })),
-          carFound: true,
+          carFound: Boolean(carBox),
           accuracy: info?.accuracy ?? null,
           testedOn: info?.testedOn ?? null,
           imageSize
         });
+
+        autoFill(learned.findings, carBox, imageSize, found);
         return;
       }
 
-      const found = await inspectPhoto(imageRef.current, setStatus);
+      if (!found) {
+        throw new Error("Could not load the detector, so the photo could not be read.");
+      }
 
       const box = found.found
         ? found.box
@@ -131,6 +199,10 @@ export default function DamagePage() {
         carFound: found.found,
         imageSize
       });
+
+      // No damage labels to work from here -- the measured fallback finds busy
+      // areas without knowing what they are -- so this only fills in the car.
+      autoFill([], found.found ? found.box : null, imageSize, found);
     } catch (error) {
       setScanError(error.message);
     } finally {
@@ -305,6 +377,78 @@ export default function DamagePage() {
 
         {/* THE BILL */}
         <div className="space-y-4">
+
+          {/* WHAT THE PHOTO FILLED IN, AND HOW MUCH TO TRUST EACH PART */}
+          {filled && (filled.panels > 0 || filled.candidates.length > 0) && (
+            <div className="border border-data/40 bg-data/5 px-5 py-4">
+              <p className="label text-data">Filled in from the photo</p>
+
+              <ul className="mt-3 space-y-2 text-xs leading-relaxed text-fog">
+                {filled.panels > 0 && (
+                  <li>
+                    <span className="text-chalk">
+                      {filled.panels} {filled.panels === 1 ? "repair" : "repairs"} below
+                    </span>{" "}
+                    — read off the photo and priced already. This is the part worth
+                    trusting: the damage was named by the classifier and placed by
+                    where it falls on the car.
+                  </li>
+                )}
+
+                {filled.unsure.length > 0 && (
+                  <li>
+                    Nothing here detects which way the car is facing, so{" "}
+                    {filled.unsure.map((item, index) => (
+                      <span key={index}>
+                        {index > 0 && ", "}
+                        <span className="text-chalk">{PANELS[item.panel]?.label}</span>
+                        {OPPOSITE_END[item.panel] && (
+                          <> could equally be the {PANELS[OPPOSITE_END[item.panel]]?.label.toLowerCase()}</>
+                        )}
+                      </span>
+                    ))}
+                    . Worth a glance.
+                  </li>
+                )}
+
+                {filled.candidates.length > 0 && (
+                  <li>
+                    <span className="text-chalk">The car is a guess.</span> Nothing
+                    can read a badge from a photograph — there is no dataset of
+                    Indian cars by model — so this is the closest match by{" "}
+                    {filled.body ? "body style and size" : "size"}
+                    {filled.colour ? `, in ${filled.colour.toLowerCase()}` : ""}.
+                    Change it below if it is wrong; the repairs stay as they are.
+                  </li>
+                )}
+              </ul>
+
+              {filled.candidates.length > 1 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {filled.candidates.map((entry) => {
+                    const key = `${entry.brand}|${entry.model}`;
+                    const active = key === selected;
+
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setSelected(key)}
+                        className={`readout border px-2 py-1 text-[10px] transition-colors ${
+                          active
+                            ? "border-data bg-data/15 text-chalk"
+                            : "border-line text-fog hover:border-data/60 hover:text-chalk"
+                        }`}
+                      >
+                        {entry.model}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="panel p-6">
             <div className="flex items-center justify-between">
               <p className="label">The damage</p>

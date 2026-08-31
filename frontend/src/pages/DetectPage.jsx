@@ -115,7 +115,9 @@ export default function DetectPage() {
     }
   };
 
-  const match = result ? closestCar(result.body) : null;
+  // Only when the shape is actually known. Opening "the closest car to a
+  // null" would be the old behaviour wearing a new coat.
+  const match = result?.body ? closestCar(result.body) : null;
 
   return (
     <div className="mx-auto max-w-[1500px] px-5 py-14 md:px-8">
@@ -285,11 +287,26 @@ export default function DetectPage() {
               <div className="panel hud-frame p-6">
                 <p className="label">Found</p>
                 <p className="mt-2 text-2xl font-medium tracking-tight capitalize">
-                  {result.body}
+                  {result.body ?? "A car"}
                 </p>
                 <p className="readout mt-1 text-[11px] text-fog">
                   detected as {result.label} · {Math.round(result.confidence * 100)}% sure
+                  {result.bodySource === "model" && result.bodyConfidence != null && (
+                    <> · shape {Math.round(result.bodyConfidence * 100)}% sure</>
+                  )}
                 </p>
+
+                {/* The classifier declining to answer is a result, not a
+                    failure, and saying so is the whole difference from what
+                    was here before -- which always named a body because a
+                    ratio always has a value. */}
+                {!result.body && (
+                  <p className="mt-3 text-xs leading-relaxed text-fog">
+                    {result.bodySource === null
+                      ? "It found a car but not clearly enough to call the shape, so it is not going to guess. Try a photo from the side or three quarters on, with the whole car in frame."
+                      : "The shape was read from the detector rather than the classifier."}
+                  </p>
+                )}
 
                 <div className="tick-rule-dense mt-5 opacity-60" />
 

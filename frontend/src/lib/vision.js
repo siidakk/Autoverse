@@ -9,6 +9,8 @@
 // rather than a saloon needs a model fine tuned on car makes, which is a
 // different piece of work and a different dataset.
 
+import { readBody } from "./bodyModel";
+
 let detector = null;
 let loading = null;
 
@@ -63,9 +65,11 @@ async function loadDetector(onProgress) {
 const VEHICLES = ["car", "truck", "bus"];
 
 // A truck in this detector's vocabulary covers pickups and vans; a bus covers
-// anything long with a tall flat side, which for our purposes is an MPV.
+// anything long with a tall flat side, which for our purposes is an MPV. These
+// two the detector really does know, so they stand. `car` is left out on
+// purpose: it covers every shape from an Alto to an SL63 and says nothing
+// about which, so the classifier answers that one.
 const BODY_FROM_CLASS = {
-  car: "Sedan",
   truck: "Pickup",
   bus: "MPV"
 };
@@ -201,15 +205,37 @@ export async function inspectPhoto(image, onProgress) {
 
   const paint = readPaint(image, best.bbox);
 
-  // A long low box is a saloon or a hatch; a tall one is something with a
-  // higher roof. It is a coarse read and is presented as one.
+  // Body style, from a classifier trained to answer it.
+  //
+  // What used to be here read the body off the aspect ratio of the box: wider
+  // than 2.4 a saloon, narrower than 1.5 a hatchback. That number describes
+  // where the photographer was standing. Side on, a Creta measured as a
+  // saloon; from three quarters the same car measured as a hatchback. It was
+  // not a coarse read, it was a measurement of the wrong thing, and it is why
+  // this page felt erratic.
+  //
+  // readBody() returns null until the model has been built and put in
+  // public/models/bodystyle, and null again when it is genuinely unsure. Both
+  // are better answers than a ratio. `bodySource` is what tells a caller
+  // whether the answer is worth acting on -- the repair page will not name a
+  // car from anything but "model".
   const ratio = width / Math.max(height, 1);
-  let body = BODY_FROM_CLASS[best.class] ?? "Sedan";
+
+  let body = BODY_FROM_CLASS[best.class] ?? null;
+  let bodySource = best.class === "car" ? null : "detector";
+  let bodyConfidence = null;
+  let bodyRecall = null;
 
   if (best.class === "car") {
-    if (ratio < 1.5) body = "Hatchback";
-    else if (ratio > 2.4) body = "Sedan";
-    else body = "SUV";
+    onProgress?.("Reading the shape");
+    const read = await readBody(image, best.bbox, onProgress);
+
+    if (read?.body) {
+      body = read.body;
+      bodySource = "model";
+      bodyConfidence = read.confidence;
+      bodyRecall = read.recall;
+    }
   }
 
   return {
@@ -218,6 +244,9 @@ export async function inspectPhoto(image, onProgress) {
     confidence: best.score,
     box: best.bbox,
     body,
+    bodySource,
+    bodyConfidence,
+    bodyRecall,
     ratio,
     paint,
     colourName: nameColour(paint.hex),
