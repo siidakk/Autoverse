@@ -34,7 +34,7 @@ export const SECTIONS = [
   {
     to: "/identify",
     label: "Identify",
-    blurb: "Recognise a car and its paint from a photo",
+    blurb: "Read a car's shape and paint from a photo",
     kicker: "Runs on your device, nothing is uploaded",
     was: "/detect"
   },
