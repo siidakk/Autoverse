@@ -44,6 +44,19 @@
 
 html {
   scroll-behavior: smooth;
+
+  /*
+    Tells the browser this page is dark, which is the only way to reach the
+    parts of a form the page does not draw.
+
+    A <select> is styled by CSS, but the list it drops open is drawn by the
+    browser itself and no rule here touches it. Without this it drew that list
+    on white while the option text inherited the page's near-white type, so the
+    model dropdown -- 186 cars long -- was effectively invisible. It also fixes
+    the scrollbars, the date pickers and the autofill styling for the same
+    reason.
+  */
+  color-scheme: dark;
 }
 
 body {
@@ -260,6 +273,22 @@ body {
   .field:focus {
     border-color: var(--color-signal);
     box-shadow: 0 0 0 3px rgba(255, 94, 26, 0.16);
+  }
+
+  /*
+    Belt and braces for the dropdown list. color-scheme above is what actually
+    fixes it, but Chrome on Windows honours explicit option colours too, and a
+    186 item list is not something to leave to a default.
+  */
+  .field option,
+  .field optgroup {
+    background: var(--color-panel);
+    color: var(--color-chalk);
+  }
+
+  .field option:checked {
+    background: var(--color-raised);
+    color: var(--color-signal);
   }
 
   /* Range sliders restyled to look like calibration controls */
