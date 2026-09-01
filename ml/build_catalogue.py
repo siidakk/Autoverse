@@ -271,7 +271,38 @@ def build():
     catalogue["listings"] = catalogue["variants"]
     catalogue["popularity"] = catalogue["variants"] / catalogue["variants"].max()
 
-    return fill_economy(catalogue), as_of
+    return portable(fill_economy(catalogue)), as_of
+
+
+def portable(catalogue):
+    """Plain Python strings, so the pickle can be opened without pyarrow.
+
+    pandas 3.0 stores text in an Arrow-backed dtype whenever pyarrow happens to
+    be installed, and it gets written into the pickle. That is invisible on a
+    machine that has pyarrow -- this one does, because reading the Stanford
+    parquet shards needs it -- and fatal on one that does not.
+
+    Which is exactly how it failed: the deploy installs the seven packages in
+    requirements.txt, pyarrow is not among them because the service only ever
+    loads pickles, and gunicorn died on startup with "No module named
+    'pyarrow'" while unpickling the catalogue. The build went green; the
+    service never came up.
+
+    Adding pyarrow to requirements would also fix it, at forty megabytes and a
+    chunk of the free tier's memory for a dependency nothing at serving time
+    actually uses. Making the artefact portable is the cheaper end to fix.
+    """
+    for column, dtype in catalogue.dtypes.items():
+        if str(dtype) in ("str", "string") or "arrow" in str(dtype).lower():
+            catalogue[column] = catalogue[column].astype(object)
+
+    # The column *names* are an Index of the same Arrow-backed dtype, and that
+    # one is easy to miss: every visible dtype reads as object and the frame
+    # still refuses to unpickle. It was the second half of the same bug.
+    if str(catalogue.columns.dtype) in ("str", "string"):
+        catalogue.columns = catalogue.columns.astype(object)
+
+    return catalogue
 
 
 def fill_economy(catalogue):
