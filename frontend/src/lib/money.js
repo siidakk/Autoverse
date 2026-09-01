@@ -42,12 +42,20 @@ export function shortMoney(value) {
   return `${lakh % 1 === 0 ? lakh : lakh.toFixed(1)}L`;
 }
 
-// The rungs a budget can sit on. Round numbers people actually say, spaced
-// closely at the bottom where most of the market is and widely at the top
-// where it thins out.
+// The rungs a budget can sit on. Round numbers people actually say.
+//
+// The spacing matters more than it looks. A first attempt went 20L, 40L, then
+// straight to a crore, which is a useless jump: a third of the catalogue lives
+// between forty lakh and a crore -- the X3, the GLC, the Q5, the XC60, the
+// whole German middle -- and there was no way to say you wanted any of it. So
+// that band steps every twenty lakh.
+//
+// Above a crore the market genuinely does thin out and wider steps are honest.
+// Below twenty lakh it needs to be fine, because most cars sold here are there.
 const LADDER = [
-  3 * LAKH, 5 * LAKH, 8 * LAKH, 12 * LAKH, 20 * LAKH, 40 * LAKH,
-  1 * CRORE, 3 * CRORE, 12 * CRORE,
+  3 * LAKH, 5 * LAKH, 8 * LAKH, 12 * LAKH, 20 * LAKH,
+  40 * LAKH, 60 * LAKH, 80 * LAKH,
+  1 * CRORE, 2 * CRORE, 3 * CRORE, 5 * CRORE, 12 * CRORE,
 ];
 
 /**

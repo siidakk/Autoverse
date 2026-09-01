@@ -64,10 +64,40 @@ check(
   `only ${cheap.length} rungs under twenty lakh, which is where most of this market is`
 );
 check(
-  real.length <= 10,
+  real.length <= 16,
   `${real.length} budget buttons is more than a panel can show`
 );
 console.log(`  ${GREEN}${real.length} rungs${OFF} ${DIM}${real.map((r) => r.label).join(" ")}${OFF}`);
+
+// --- no useless jumps ------------------------------------------------------
+// The first version went 20L, 40L, then straight to a crore. A third of the
+// catalogue sits in that gap -- the X3, the GLC, the Q5, the XC60 -- and there
+// was no way to ask for any of it. Below a crore, no rung may be more than
+// twice the one before it. Above a crore the market really is sparse and wider
+// steps are fair.
+const CRORE = 10000000;
+
+for (let i = 1; i < real.length; i += 1) {
+  const from = real[i - 1].value;
+  const to = real[i].value;
+
+  if (to > CRORE) continue;
+
+  check(
+    to / from <= 2.01,
+    `${real[i - 1].label} jumps straight to ${real[i].label}, ` +
+    `${(to / from).toFixed(1)} times over — too coarse below a crore`
+  );
+}
+
+// And specifically the band that was wrong, which should step in twenties.
+for (const wanted of [4000000, 6000000, 8000000, 10000000]) {
+  check(
+    real.some((rung) => rung.value === wanted),
+    `no button for ${money(wanted)}`
+  );
+}
+console.log(`  ${GREEN}graduated${OFF} ${DIM}40L 60L 80L 1cr all present, nothing doubles below a crore${OFF}`);
 
 // --- labels have to fit on a button ----------------------------------------
 for (const rung of real) {
