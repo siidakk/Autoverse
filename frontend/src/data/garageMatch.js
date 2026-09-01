@@ -15,6 +15,28 @@ const BODY_FALLBACK = {
   Convertible: ["Coupe"]
 };
 
+/**
+ * The closest garage car to a body style on its own.
+ *
+ * Used by Identify, which has a shape from the classifier and no brand. It had
+ * its own copy of this map and its own search, and the copy was missing Coupe
+ * and Convertible -- the two bodies the classifier gained when the luxury half
+ * went into the catalogue. Latent rather than broken, because the garage
+ * happens to hold both, but it is the same bug as the two definitions of
+ * "Luxury": one idea, written down twice, drifting apart.
+ */
+export function matchGarageBody(body) {
+  const sameBody = cars.find((car) => car.bodyStyle === body);
+  if (sameBody) return { car: sameBody, exact: true };
+
+  for (const fallback of BODY_FALLBACK[body] ?? []) {
+    const near = cars.find((car) => car.bodyStyle === fallback);
+    if (near) return { car: near, exact: false };
+  }
+
+  return { car: cars[0], exact: false };
+}
+
 export function matchGarageCar(recommendation) {
   const wanted = recommendation.body;
 

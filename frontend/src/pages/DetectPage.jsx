@@ -2,31 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { inspectPhoto, warmDetector, detectorState, MODEL_SIZE_MB } from "../lib/vision";
-import { cars } from "../data/cars";
+import { matchGarageBody } from "../data/garageMatch";
 
 // Photo of a car, in. The closest thing we can actually show you, out, painted
 // the colour yours is. This is the way into the configurator for somebody who
 // already owns the car they want to change.
-
-function closestCar(body) {
-  const exact = cars.find((car) => car.bodyStyle === body);
-  if (exact) return { car: exact, exact: true };
-
-  const near = {
-    Hatchback: ["Sedan", "Coupe"],
-    Sedan: ["Coupe", "SUV"],
-    SUV: ["Pickup", "Sedan"],
-    MPV: ["SUV", "Pickup"],
-    Pickup: ["SUV"]
-  }[body] ?? [];
-
-  for (const style of near) {
-    const match = cars.find((car) => car.bodyStyle === style);
-    if (match) return { car: match, exact: false };
-  }
-
-  return { car: cars[0], exact: false };
-}
 
 export default function DetectPage() {
   const [preview, setPreview] = useState(null);
@@ -117,7 +97,7 @@ export default function DetectPage() {
 
   // Only when the shape is actually known. Opening "the closest car to a
   // null" would be the old behaviour wearing a new coat.
-  const match = result?.body ? closestCar(result.body) : null;
+  const match = result?.body ? matchGarageBody(result.body) : null;
 
   return (
     <div className="mx-auto max-w-[1500px] px-5 py-14 md:px-8">
