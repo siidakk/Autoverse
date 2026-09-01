@@ -10,6 +10,7 @@
 // different piece of work and a different dataset.
 
 import { readBody } from "./bodyModel";
+import { atNaturalSize } from "./imageSource";
 
 let detector = null;
 let loading = null;
@@ -31,9 +32,22 @@ export function warmDetector(onProgress) {
     loading = (async () => {
       onProgress?.("Starting up");
 
-      const [tf, , cocoSsd] = await Promise.all([
+      // Both backends, and the CPU one is not optional.
+      //
+      // WebGL does not implement every kernel. A handful, non-max suppression
+      // among them, are registered on CPU only and the WebGL backend forwards
+      // to them -- and non-max suppression is how an object detector turns a
+      // heap of overlapping boxes into one box per car, so coco-ssd reaches it
+      // on every single call.
+      //
+      // Without it, detection threw "Backend name 'cpu' not found in registry"
+      // after the download, the model warning about locking the UI thread went
+      // by first, and the failure arrived late enough to look like a flaky
+      // model rather than a missing package.
+      const [tf, , , cocoSsd] = await Promise.all([
         import("@tensorflow/tfjs-core"),
         import("@tensorflow/tfjs-backend-webgl"),
+        import("@tensorflow/tfjs-backend-cpu"),
         import("@tensorflow-models/coco-ssd")
       ]);
 
@@ -190,7 +204,14 @@ export async function inspectPhoto(image, onProgress) {
   const model = await loadDetector(onProgress);
 
   onProgress?.("Looking for a car");
-  const found = await model.detect(image, 10, 0.25);
+
+  // Detected on a canvas rather than on the <img>, so the boxes come back in
+  // the photograph's own pixels. coco-ssd reads an image element at its layout
+  // size, which means its boxes were arriving scaled by whatever CSS had done
+  // to the picture -- and those boxes decide where the overlay is drawn, which
+  // part of the paint is sampled, and which panel a dent belongs to.
+  const source = atNaturalSize(image);
+  const found = await model.detect(source, 10, 0.25);
 
   const vehicles = found
     .filter((item) => VEHICLES.includes(item.class))
@@ -203,7 +224,7 @@ export async function inspectPhoto(image, onProgress) {
   const best = vehicles[0];
   const [, , width, height] = best.bbox;
 
-  const paint = readPaint(image, best.bbox);
+  const paint = readPaint(source, best.bbox);
 
   // Body style, from a classifier trained to answer it.
   //
@@ -228,7 +249,7 @@ export async function inspectPhoto(image, onProgress) {
 
   if (best.class === "car") {
     onProgress?.("Reading the shape");
-    const read = await readBody(image, best.bbox, onProgress);
+    const read = await readBody(source, best.bbox, onProgress);
 
     if (read?.body) {
       body = read.body;

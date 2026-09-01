@@ -16,6 +16,8 @@
 // detector rather than a classifier, and pretending otherwise by drawing a
 // rectangle around a guess is exactly the failure this replaces.
 
+import { atNaturalSize } from "./imageSource";
+
 const MODEL_URL = "/models/damage/model.json";
 const META_URL = "/models/damage/damage.json";
 
@@ -59,6 +61,9 @@ export async function warmModel(onProgress) {
       ]);
 
       await import("@tensorflow/tfjs-backend-webgl");
+      // CPU too: a few kernels are registered only there and WebGL forwards
+      // to them. See the note in vision.js.
+      await import("@tensorflow/tfjs-backend-cpu");
       await tf.ready();
 
       model = await converter.loadGraphModel(MODEL_URL);
@@ -94,21 +99,23 @@ export async function classify(image, region = null) {
 
   const tf = await import("@tensorflow/tfjs-core");
   const size = meta.imageSize ?? 224;
+  const source = atNaturalSize(image);
 
   const scores = tf.tidy(() => {
-    let pixels = tf.browser.fromPixels(image);
+    let pixels = tf.browser.fromPixels(source);
 
     if (region) {
-      const { x, y, width, height } = region;
-      pixels = tf.slice(
-        pixels,
-        [Math.max(0, Math.round(y)), Math.max(0, Math.round(x)), 0],
-        [
-          Math.min(Math.round(height), pixels.shape[0] - Math.round(y)),
-          Math.min(Math.round(width), pixels.shape[1] - Math.round(x)),
-          3
-        ]
-      );
+      // Clamped in the right order. The start is pinned inside the image
+      // first, and the extent is then measured from where it actually starts
+      // -- taking it from the unclamped coordinate is what allowed a window
+      // beginning past the edge to ask for a negative number of pixels.
+      const top = Math.min(Math.max(0, Math.round(region.y)), pixels.shape[0] - 1);
+      const left = Math.min(Math.max(0, Math.round(region.x)), pixels.shape[1] - 1);
+
+      const height = Math.max(1, Math.min(Math.round(region.height), pixels.shape[0] - top));
+      const width = Math.max(1, Math.min(Math.round(region.width), pixels.shape[1] - left));
+
+      pixels = tf.slice(pixels, [top, left, 0], [height, width, 3]);
     }
 
     const resized = tf.image.resizeBilinear(pixels, [size, size]);
@@ -229,8 +236,13 @@ export async function scan(image, onProgress) {
   const ready = await warmModel(onProgress);
   if (!ready || !meta) return null;
 
-  const width = image.naturalWidth ?? image.width;
-  const height = image.naturalHeight ?? image.height;
+  // Drawn once rather than per window. There are around thirty windows and
+  // each classify() would otherwise repaint the whole photograph to read a
+  // corner of it.
+  const source = atNaturalSize(image);
+
+  const width = source.width;
+  const height = source.height;
 
   const windows = windowsOver(width, height);
   const floor = meta.confidenceFloor ?? 0.5;
@@ -238,7 +250,7 @@ export async function scan(image, onProgress) {
 
   for (let i = 0; i < windows.length; i++) {
     const region = windows[i];
-    const result = await classify(image, region);
+    const result = await classify(source, region);
 
     if (
       result?.sure &&

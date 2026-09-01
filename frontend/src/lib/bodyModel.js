@@ -58,6 +58,7 @@ export async function warmBodyModel(onProgress) {
       ]);
 
       await import("@tensorflow/tfjs-backend-webgl");
+      await import("@tensorflow/tfjs-backend-cpu");
       await tf.ready();
 
       model = await converter.loadGraphModel(MODEL_URL);
@@ -89,8 +90,10 @@ export async function warmBodyModel(onProgress) {
 /**
  * Reads the body style of the car in a crop of the photograph.
  *
- * @param image   an <img> the browser has already decoded
- * @param box     [left, top, width, height] of the car, or null for the lot
+ * @param image   the photograph, as a canvas from imageSource.js or an <img>
+ * @param box     [left, top, width, height] of the car, or null for the lot.
+ *                Must be in the same pixels as `image` -- see imageSource.js
+ *                for why that is worth saying out loud.
  * @returns { body, confidence, ranked } or null if the model is not available
  */
 export async function readBody(image, box, onProgress) {
@@ -103,9 +106,12 @@ export async function readBody(image, box, onProgress) {
   // Cropped to the car before it is asked. The classifier was trained on
   // photographs that are mostly car, so handing it a car in the corner of a
   // car park is a different question from the one it learned to answer.
+  //
+  // A canvas has width and height; an <img> has naturalWidth as well, and only
+  // that one is its real size. Both are accepted, so both are asked properly.
   const [left, top, width, height] = box?.length
     ? box
-    : [0, 0, image.naturalWidth, image.naturalHeight];
+    : [0, 0, image.naturalWidth ?? image.width, image.naturalHeight ?? image.height];
 
   const canvas = document.createElement("canvas");
   canvas.width = size;
