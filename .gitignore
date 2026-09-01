@@ -34,6 +34,7 @@ backend/.data/
 ml/data/
 ml/damage/
 ml/bodystyle/
+ml/make/
 
 # Deck QA renders, regenerated from the pptx whenever they are needed
 docs/render/
