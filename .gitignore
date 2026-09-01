@@ -49,3 +49,4 @@ ml/catalogue_new.pkl
 # Scratch photo used to drive the photo pages end to end during development.
 # Not part of the site.
 frontend/public/__test-car.png
+frontend/public/__test-car-small.jpg

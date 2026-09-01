@@ -296,6 +296,20 @@ export default function DetectPage() {
                   )}
                 </p>
 
+                {/* Not every class is equally reliable, and one overall
+                    accuracy hides that. It is right about a pickup nine times
+                    in ten and about a hatchback fewer than one time in two, so
+                    a hatchback call gets said out loud -- especially here,
+                    where hatchbacks are most of what anybody will photograph. */}
+                {result.body && result.bodyRecall != null && result.bodyRecall < 0.6 && (
+                  <p className="mt-3 border-l-2 border-line pl-3 text-xs leading-relaxed text-fog">
+                    Treat this one lightly. Of the {result.body.toLowerCase()}s it
+                    was tested on it identified {Math.round(result.bodyRecall * 100)}%
+                    — its weakest class, because it learned from American cars and
+                    this shape differs most between the two markets.
+                  </p>
+                )}
+
                 {/* The classifier declining to answer is a result, not a
                     failure, and saying so is the whole difference from what
                     was here before -- which always named a body because a

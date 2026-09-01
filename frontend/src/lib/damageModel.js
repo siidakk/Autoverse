@@ -91,18 +91,22 @@ export async function warmModel(onProgress) {
   return loading;
 }
 
-// Classifies one photograph. `region` optionally narrows it to a crop, which is
-// how the page asks about one panel rather than the whole car.
-export async function classify(image, region = null) {
-  const ready = await warmModel();
-  if (!ready || !meta) return null;
-
-  const tf = await import("@tensorflow/tfjs-core");
+/**
+ * Scores one region of a photograph that is already on the GPU.
+ *
+ * Split out from classify() because the upload is the expensive part and the
+ * scan below asks about fifty-odd regions of the same picture. Measured in the
+ * browser: one window took thirty seconds when each call did its own
+ * tf.browser.fromPixels() of the full 1600 by 1000 canvas -- a texture upload
+ * of nearly five million floats, repeated per window, for a crop that is then
+ * squeezed down to 224 square anyway. Uploading once turns a scan from tens of
+ * minutes into seconds.
+ */
+async function scoreRegion(tf, pixels, region) {
   const size = meta.imageSize ?? 224;
-  const source = atNaturalSize(image);
 
   const scores = tf.tidy(() => {
-    let pixels = tf.browser.fromPixels(source);
+    let crop = pixels;
 
     if (region) {
       // Clamped in the right order. The start is pinned inside the image
@@ -115,10 +119,10 @@ export async function classify(image, region = null) {
       const height = Math.max(1, Math.min(Math.round(region.height), pixels.shape[0] - top));
       const width = Math.max(1, Math.min(Math.round(region.width), pixels.shape[1] - left));
 
-      pixels = tf.slice(pixels, [top, left, 0], [height, width, 3]);
+      crop = tf.slice(pixels, [top, left, 0], [height, width, 3]);
     }
 
-    const resized = tf.image.resizeBilinear(pixels, [size, size]);
+    const resized = tf.image.resizeBilinear(crop, [size, size]);
 
     // Exactly what MobileNetV2 was trained with, and what train_damage.py
     // applied. Anything else here reads as a bad model rather than a wrong
@@ -151,6 +155,23 @@ export async function classify(image, region = null) {
     // the page can be specific rather than showing one overall percentage.
     recall: meta.perClass?.[best.label]?.recall ?? null
   };
+}
+
+// Classifies one photograph. `region` optionally narrows it to a crop, which is
+// how the page asks about one panel rather than the whole car. For many regions
+// of the same picture, use scan() -- this uploads the image on every call.
+export async function classify(image, region = null) {
+  const ready = await warmModel();
+  if (!ready || !meta) return null;
+
+  const tf = await import("@tensorflow/tfjs-core");
+  const pixels = tf.browser.fromPixels(atNaturalSize(image));
+
+  try {
+    return await scoreRegion(tf, pixels, region);
+  } finally {
+    pixels.dispose();
+  }
 }
 
 // --- finding where the damage is ---
@@ -248,27 +269,35 @@ export async function scan(image, onProgress) {
   const floor = meta.confidenceFloor ?? 0.5;
   const found = [];
 
-  for (let i = 0; i < windows.length; i++) {
-    const region = windows[i];
-    const result = await classify(source, region);
+  // The photograph goes to the GPU once and every window is cut from it there.
+  const tf = await import("@tensorflow/tfjs-core");
+  const pixels = tf.browser.fromPixels(source);
 
-    if (
-      result?.sure &&
-      result.best.label !== "undamaged" &&
-      result.best.confidence >= floor
-    ) {
-      found.push({
-        ...region,
-        label: result.best.label,
-        confidence: result.best.confidence
-      });
-    }
+  try {
+    for (let i = 0; i < windows.length; i++) {
+      const region = windows[i];
+      const result = await scoreRegion(tf, pixels, region);
 
-    // Yields to the browser so a long scan does not freeze the page.
-    if (i % 4 === 3) {
-      onProgress?.(`Looking… ${Math.round(((i + 1) / windows.length) * 100)}%`);
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (
+        result?.sure &&
+        result.best.label !== "undamaged" &&
+        result.best.confidence >= floor
+      ) {
+        found.push({
+          ...region,
+          label: result.best.label,
+          confidence: result.best.confidence
+        });
+      }
+
+      // Yields to the browser so a long scan does not freeze the page.
+      if (i % 4 === 3) {
+        onProgress?.(`Looking… ${Math.round(((i + 1) / windows.length) * 100)}%`);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
     }
+  } finally {
+    pixels.dispose();
   }
 
   return {
