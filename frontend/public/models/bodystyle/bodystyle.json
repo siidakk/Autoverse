@@ -9,46 +9,46 @@
     "Sedan"
   ],
   "imageSize": 224,
-  "accuracy": 0.7238,
+  "accuracy": 0.7367,
   "confidenceFloor": 0.55,
-  "trainedOn": 5314,
-  "testedOn": 1564,
+  "trainedOn": 10562,
+  "testedOn": 3107,
   "source": "Stanford Cars (Krause et al., ICCV Workshops 2013), relabelled by body style",
   "perClass": {
     "Convertible": {
-      "precision": 0.788,
-      "recall": 0.667,
-      "support": 201
+      "precision": 0.691,
+      "recall": 0.774,
+      "support": 399
     },
     "Coupe": {
-      "precision": 0.646,
-      "recall": 0.671,
-      "support": 283
+      "precision": 0.703,
+      "recall": 0.547,
+      "support": 561
     },
     "Hatchback": {
-      "precision": 0.398,
-      "recall": 0.44,
-      "support": 116
+      "precision": 0.513,
+      "recall": 0.517,
+      "support": 232
     },
     "MPV": {
-      "precision": 0.759,
-      "recall": 0.842,
-      "support": 101
+      "precision": 0.829,
+      "recall": 0.87,
+      "support": 200
     },
     "Pickup": {
-      "precision": 0.837,
-      "recall": 0.914,
-      "support": 152
+      "precision": 0.848,
+      "recall": 0.921,
+      "support": 303
     },
     "SUV": {
-      "precision": 0.823,
-      "recall": 0.77,
-      "support": 296
+      "precision": 0.821,
+      "recall": 0.811,
+      "support": 587
     },
     "Sedan": {
-      "precision": 0.731,
-      "recall": 0.735,
-      "support": 415
+      "precision": 0.717,
+      "recall": 0.756,
+      "support": 825
     }
   }
 }
