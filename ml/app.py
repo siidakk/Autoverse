@@ -432,6 +432,12 @@ def valuation_options():
                 # a list of a hundred and twenty to find their own.
                 "body": row["body"],
                 "length": int(row["length_mm"] or 0),
+                # The catalogue's own banding. The repair page used to work
+                # this out again from the price with different thresholds, so
+                # a 25 lakh car was Premium on one page and Luxury on another
+                # -- and the repair bill moved 57% depending which page you
+                # were looking at. One definition, sent from where it is set.
+                "segment": row["segment"],
             }
             for _, row in known.iterrows()
         ],

@@ -71,11 +71,11 @@ export default function DamagePage() {
     (entry) => `${entry.brand}|${entry.model}` === selected
   );
 
-  const segment = car
-    ? car.typical >= 2000000 ? "Luxury"
-      : car.typical >= 900000 ? "Premium"
-        : car.typical >= 450000 ? "Mid" : "Budget"
-    : "Mid";
+  // Taken from the catalogue rather than recomputed here. This page used its
+  // own thresholds -- Luxury at 20 lakh against the catalogue's 40 -- so the
+  // same car could be Premium on Discover and Luxury here, and the bill moved
+  // by 57% between two pages describing one car.
+  const segment = car?.segment ?? "Mid";
 
   const cost = repairCost(items, segment);
 
