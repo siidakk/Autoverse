@@ -10,7 +10,6 @@
 // different piece of work and a different dataset.
 
 import { readBody } from "./bodyModel";
-import { readMake } from "./makeModel";
 import { atNaturalSize } from "./imageSource";
 
 let detector = null;
@@ -271,12 +270,6 @@ export async function inspectPhoto(image, onProgress) {
     bodySource = "detector";
   }
 
-  // And whose car it is, which is the half that turns a shape into a name.
-  // Null until the model is built, and null again whenever it is not sure --
-  // which for an Indian car it very often should be, since it has never seen a
-  // Maruti, a Tata, a Mahindra or a Kia. See makeModel.js.
-  const badge = await readMake(source, best.bbox, onProgress);
-
   return {
     found: true,
     label: best.class,
@@ -286,9 +279,6 @@ export async function inspectPhoto(image, onProgress) {
     bodySource,
     bodyConfidence,
     bodyRecall,
-    make: badge?.make ?? null,
-    makeConfidence: badge?.confidence ?? null,
-    makeRecall: badge?.recall ?? null,
     ratio,
     paint,
     colourName: nameColour(paint.hex),

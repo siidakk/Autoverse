@@ -1,35 +1,48 @@
-"""Trains a manufacturer classifier -- whose car is this, not what shape is it.
+"""Trains a manufacturer classifier, which was measured and then not shipped.
 
     python label_makes.py && python train_make.py
 
-Reads the same photographs train_bodystyle.py uses, relabelled by make, so the
-cached MobileNetV2 features are reused and the slow part does not happen twice.
+THE RESULT, BEFORE ANYTHING ELSE
+--------------------------------
+This does not work well enough to put on the page, and the numbers are here so
+that nobody spends another day rediscovering it.
 
-Why
----
-Body style answers "that is an SUV". The complaint was that the page recognises
-shapes rather than cars, and it is a fair one: a Fortuner came back as "Pickup"
-and there was nothing on the card that named a car.
+    overall accuracy   36.5% on 2,865 held out photographs, 33 makes
+    target precision   80%, never reached at any usable confidence
+    best available     73.4% precision, answering only 20.7% of the time
+    Toyota             precision 0.15, recall 0.21
 
-This does not fix that on its own -- nothing built from public data can read
-"Fortuner" off a photograph, because no dataset of Indian cars by model exists.
-What it can do is narrow the answer enormously. A white SUV is one of seventy
-four cars in the catalogue; a white *Toyota* SUV is one of about four, and at
-that point the page can put a name on it and be roughly right.
+That last line is the one that decided it. The complaint that prompted this was
+a Toyota Fortuner being called a Pickup, and a badge reader that says "Toyota"
+correctly fifteen times in a hundred would have replaced a wrong shape with a
+wrong badge -- worse, because a badge looks like knowledge.
 
-The limit, stated plainly because it is severe
-----------------------------------------------
-Stanford Cars is American. Its 49 makes cover 18 of the 31 brands in the
-catalogue, and the thirteen it has never seen include Maruti Suzuki, Tata,
-Mahindra and Kia -- most of what is actually sold in India. Shown a Swift, this
-model has no correct answer available to it and will pick whichever of its 49
-makes looks nearest.
+Only the exotics do respectably (Ferrari 0.72, Lamborghini 0.53), because they
+look like nothing else. Everything a normal person photographs -- Toyota 0.15,
+Land Rover 0.07, Jeep 0.16, Hyundai 0.24 -- is guesswork.
 
-That is why the floor matters more here than anywhere else in this project.
-It is swept on held out data and set where the model is right four times in
-five among the answers it gives, and below it the page says nothing about the
-make rather than naming the wrong one. A confident wrong badge is worse than
-no badge.
+The frontend wiring for it was written and then removed. The scripts stay,
+because the measurement is the useful part and because if a dataset of Indian
+cars ever appears this is the shape the work takes.
+
+WHY IT FAILS
+------------
+Not enough images per make (9,739 training photographs over 33 classes), a
+frozen backbone that was never fine-tuned for fine-grained distinctions, and a
+task that is genuinely hard: telling a Toyota from a Honda from a Hyundai at
+three quarters on is not something a linear head over generic ImageNet features
+can do. Fine-tuning the backbone would help and needs a GPU this project does
+not have.
+
+And underneath all of it, the fatal one: Stanford is American. Its makes cover
+seventeen of the thirty one brands in the catalogue, and the missing fourteen
+include Maruti Suzuki, Tata, Mahindra and Kia -- most of what is on the road in
+India. Even a perfect model here would be silent on the majority of cars
+anybody would photograph.
+
+It reads the same photographs train_bodystyle.py uses, relabelled by make, so
+the cached MobileNetV2 features are reused and the slow part does not run
+twice. Re-running it is cheap; re-running it will not make the numbers better.
 """
 
 import json
