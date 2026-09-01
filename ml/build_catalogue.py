@@ -55,6 +55,7 @@ to 85.
 
 import json
 
+import numpy as np
 import pandas as pd
 from huggingface_hub import hf_hub_download
 
@@ -270,6 +271,20 @@ def build():
     catalogue = pd.DataFrame(rows)
     catalogue["listings"] = catalogue["variants"]
     catalogue["popularity"] = catalogue["variants"] / catalogue["variants"].max()
+
+    # Price, on the scale people actually compare prices on.
+    #
+    # The catalogue spans 235 to 1 -- four lakh to eleven crore -- and the
+    # ranking standardises its features. On a linear scale that makes the
+    # standard deviation 1.6 crore, so a 17.8 lakh Seltos sits 0.26 standard
+    # deviations from a 60 lakh target and a Swift sits 0.03 from a 12 lakh one.
+    # Price stopped being a signal at the bottom, while a Rolls-Royce two crore
+    # from target was penalised two full deviations. Wrong in both directions.
+    #
+    # A log scale makes the distance proportional, which is how anybody
+    # actually thinks about it: "a third under budget", never "26 lakh under".
+    # The same three comparisons become 0.99, 0.38 and 0.28.
+    catalogue["price_log"] = np.log10(catalogue["price"])
 
     return portable(fill_economy(catalogue)), as_of
 

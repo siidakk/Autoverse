@@ -36,13 +36,18 @@ from build_catalogue import ATTRIBUTION, build as new_catalogue
 
 # The axes a buyer actually expresses a preference along.
 #
+# Price is logged. Standardising a column that runs from four lakh to eleven
+# crore leaves the bottom of it indistinguishable -- a Swift and a twelve lakh
+# car were 0.03 standard deviations apart -- so the ranking quietly stopped
+# sorting on budget and sorted on everything else instead. See build_catalogue.
+#
 # Economy is running cost rather than kmpl. An electric car has no kmpl at all,
 # so with the old feature every one of the twenty seven in this catalogue was
 # imputed to the market average and none of them could ever rank as frugal --
 # which is precisely backwards. Rupees a kilometre is the one axis a petrol, a
 # diesel, a CNG and an electric car can all be put on. Note that it runs the
 # other way: on this feature, lower is better.
-FEATURES = ["price", "power", "cost_per_km_ranked", "seats", "engine_cc"]
+FEATURES = ["price_log", "power", "cost_per_km_ranked", "seats", "engine_cc"]
 
 # What a specification is worth is judged on the published figures plus the two
 # dimensions that decide how much car you are getting for the money.

@@ -70,9 +70,14 @@ const LADDER = [
  * @param priceRange [cheapest, dearest] from /meta
  */
 export function budgetsFor(priceRange) {
+  const cheapest = priceRange?.[0] ?? 0;
   const dearest = priceRange?.[1] ?? 4000000;
 
-  const rungs = LADDER.filter((rung) => rung <= dearest);
+  // Nothing below the cheapest car in the catalogue. A three lakh button was
+  // being offered when the cheapest car is 4.69 lakh, so it could only ever
+  // answer "nothing fits" -- a control that is guaranteed to fail is worse
+  // than no control.
+  const rungs = LADDER.filter((rung) => rung <= dearest && rung >= cheapest);
 
   // Whatever happens, the last rung has to clear the priciest car, or it
   // cannot be chosen at all.

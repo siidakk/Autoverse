@@ -40,6 +40,25 @@ const PRIORITY = [
 
 const SLOW_REQUEST_MS = 4000;
 
+// How many columns to lay a set of buttons out in.
+//
+// The counts are not fixed any more -- fuels, bodies, seats and budgets all
+// come from the catalogue now -- so a hard coded column count leaves ragged
+// holes the moment the data changes. Thirteen budget rungs in five columns is
+// two rows of five and a row of three with two gaps in it, which is what it
+// looked like.
+//
+// So it picks the widest option that divides evenly, and falls back to the
+// one leaving the fewest empty cells when nothing divides.
+function tidyColumns(count, options = [5, 4, 3]) {
+  const exact = options.find((columns) => count % columns === 0);
+  if (exact) return exact;
+
+  return options.reduce((best, columns) =>
+    (columns - (count % columns)) % columns < (best - (count % best)) % best ? columns : best
+  );
+}
+
 function Field({ label, children }) {
   return (
     <label className="block">
@@ -166,17 +185,17 @@ export default function MLPanel({ onResults }) {
             options={budgets}
             value={budget}
             onChange={setBudget}
-            columns={5}
+            columns={tidyColumns(budgets.length)}
           />
         </Field>
 
         <Field label="Fuel">
-          <Segmented options={fuels} value={fuel} onChange={setFuel} columns={4} />
+          <Segmented options={fuels} value={fuel} onChange={setFuel} columns={tidyColumns(fuels.length)} />
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Seats needed">
-            <Segmented options={seatCounts} value={seats} onChange={setSeats} columns={5} />
+            <Segmented options={seatCounts} value={seats} onChange={setSeats} columns={tidyColumns(seatCounts.length, [3, 4])} />
           </Field>
 
           <Field label="Gearbox">
@@ -190,7 +209,7 @@ export default function MLPanel({ onResults }) {
         </div>
 
         <Field label="Body">
-          <Segmented options={bodies} value={body} onChange={setBody} columns={4} />
+          <Segmented options={bodies} value={body} onChange={setBody} columns={tidyColumns(bodies.length)} />
         </Field>
 
         <Field label="How you drive">

@@ -66,8 +66,16 @@ CORS(app)
 # The economy axis is rupees a kilometre rather than kmpl, so that an electric
 # car can be compared with a diesel at all. It is the one feature here where a
 # lower number is the better one.
+# Price carries more than it used to, but not so much that it is the only thing.
+#
+# Both numbers were measured across every budget rung. At 2.4 the cheapest of
+# five results sat at 68% of budget; at 3.2 it sits at 77%, and past that the
+# curve is flat. Raising it to 4.0 bought one more point of fit and cost
+# something worse: value, balanced and space started returning identical
+# results, because price swamped the very preference the buyer had just
+# expressed. 3.2 keeps the fit and leaves the other axes room to matter.
 WEIGHTS = {
-    "price": 2.4,
+    "price_log": 3.2,
     "power": 1.0,
     "cost_per_km_ranked": 1.0,
     "seats": 1.6,
@@ -86,11 +94,14 @@ USAGE = {
     "highway": 0.7,
 }
 
+# These have to be strong enough to actually move the answer. They were nudges
+# on top of the base weights, and once price started pulling properly, three of
+# the four returned the same five cars -- which makes asking the question a lie.
 PRIORITY = {
-    "value": {"price": 3.0, "cost_per_km_ranked": 1.5},
+    "value": {"price_log": 4.0, "cost_per_km_ranked": 2.6},
     "balanced": {},
-    "comfort": {"seats": 2.2, "cost_per_km_ranked": 0.8},
-    "performance": {"power": 2.4, "engine_cc": 1.4, "cost_per_km_ranked": 0.4},
+    "comfort": {"seats": 3.6, "cost_per_km_ranked": 0.8},
+    "performance": {"power": 3.2, "engine_cc": 2.0, "cost_per_km_ranked": 0.4},
 }
 
 
@@ -117,23 +128,53 @@ def rupees(value):
     return int(round(float(value)))
 
 
-def build_target(preferences):
-    """The car the stated preferences describe, in the same space as the index."""
+def build_target(preferences, affordable=None):
+    """The car the stated preferences describe, in the same space as the index.
+
+    The quantiles are taken over what the buyer can actually afford, not over
+    the whole catalogue. That distinction did not matter while the catalogue
+    was all mass-market, and it matters enormously now: "balanced power" over
+    186 cars is about 150 bhp, so a twelve crore search was aiming at the power
+    of a mid-size hatchback and ranked a 4.5 crore Bentayga above an eleven
+    crore Cullinan for being nearer to it. Balanced means the middle of what is
+    in front of you.
+    """
     budget = preferences["budget"]
     style = DRIVING[preferences["driving"]]
 
-    span = catalogue["power"]
-    power_target = span.quantile(style["power"])
-    engine_target = catalogue["engine_cc"].quantile(style["engine"])
+    # Falls back to the whole catalogue only if nothing is affordable, where
+    # the target is academic anyway because there is nothing to rank.
+    rows = catalogue if affordable is None or affordable.empty else affordable
+
+    # And narrowed again to the cars actually in this price bracket.
+    #
+    # "Affordable" is not enough on its own: at twelve crore every car in the
+    # catalogue is affordable, so the middle of it is still a mid-size
+    # hatchback, and the search aimed at 150 bhp. Somebody spending twelve
+    # crore is choosing between cars that cost roughly that, so balanced ought
+    # to mean the middle of *those*.
+    #
+    # Widened if the bracket is thin, because at the top of this market it
+    # genuinely is -- there are fourteen cars above two and a half crore, and a
+    # quantile over three of them is noise.
+    for floor in (0.55, 0.35, 0.15, 0.0):
+        bracket = rows[rows["price"] >= budget * floor]
+        if len(bracket) >= 8:
+            rows = bracket
+            break
+
+    power_target = rows["power"].quantile(style["power"])
+    engine_target = rows["engine_cc"].quantile(style["engine"])
 
     # Caring about economy means wanting a low running cost, so the harder the
     # pull the further *down* the cost distribution the target sits.
     economy_pull = min(0.95, 0.45 * USAGE[preferences["usage"]] * style["mileage"])
-    cost_target = catalogue["cost_per_km_ranked"].quantile(1 - economy_pull)
+    cost_target = rows["cost_per_km_ranked"].quantile(1 - economy_pull)
 
     return pd.DataFrame([{
         # People buy near the top of what they will spend, not at the bottom.
-        "price": budget * 0.85,
+        # Logged, like the column it is compared against.
+        "price_log": np.log10(max(budget * 0.85, 1)),
         "power": power_target,
         "cost_per_km_ranked": cost_target,
         "seats": preferences["seats"],
@@ -303,15 +344,27 @@ def rank(preferences, count=5):
 
     # Content based filtering: distance from the ideal the preferences describe,
     # measured on standardised features so rupees cannot drown out seats.
-    target = scaler.transform(build_target(preferences))[0]
+    target = scaler.transform(build_target(preferences, rows))[0]
     points = scaler.transform(rows[FEATURES])
     weights = weights_for(preferences)
 
     distance = np.sqrt((((points - target) * weights) ** 2).sum(axis=1))
 
     # A nudge towards cars people actually own, which is as close to a
-    # collaborative signal as this data gets.
-    score = distance - rows["popularity"].to_numpy() * 0.35
+    # collaborative signal as this data gets. It can break a near tie and
+    # nothing more.
+    #
+    # It used to be worth 0.35, which was not a nudge, it was a thumb on the
+    # scale. Popularity here is the number of variants a maker offers, so it
+    # runs to 1.0 for a mass-market car and sits at 0.045 for every curated
+    # one, which have no variant list at all. Against a price signal that was
+    # itself only worth about 0.6 on a linear scale, that meant a 17.8 lakh
+    # Seltos could out-rank appropriately priced cars in a 60 lakh search: it
+    # was handed back more than half its price penalty for being popular.
+    #
+    # Price is logged now and discriminates properly, and this is small enough
+    # that it can only separate cars already close on everything else.
+    score = distance - rows["popularity"].to_numpy() * 0.06
 
     rows = rows.assign(distance=distance, score=score).sort_values("score")
     return rows, rows.head(count)
