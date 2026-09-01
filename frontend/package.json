@@ -14,7 +14,8 @@
     "test:lights": "node tools/test-lights.mjs public/models",
     "test:engines": "node tools/test-engines.mjs",
     "test:ar": "node tools/test-ar.mjs",
-    "test:panels": "node tools/test-panels.mjs"
+    "test:panels": "node tools/test-panels.mjs",
+    "test:money": "node tools/test-money.mjs"
   },
   "dependencies": {
     "@pmndrs/assets": "^1.7.0",

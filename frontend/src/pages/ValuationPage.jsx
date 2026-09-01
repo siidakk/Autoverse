@@ -2,11 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { valuationOptions, valueCar, describeError } from "../lib/api";
 import DepreciationChart from "../components/valuation/DepreciationChart";
+import { money } from "../lib/money";
 
-const rupees = (value) =>
-  value >= 100000
-    ? `₹${(value / 100000).toFixed(value >= 1000000 ? 2 : 2)} L`
-    : `₹${value.toLocaleString("en-IN")}`;
+// Shared, so a crore reads as a crore on every page. See lib/money.js.
+const rupees = money;
 
 const KM_STEPS = [10000, 30000, 60000, 90000, 120000, 200000];
 

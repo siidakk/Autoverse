@@ -127,7 +127,7 @@ function HeroLoader() {
 
 const numbers = [
   { value: 15, suffix: "", label: "cars in 3D", note: "each one measured, not hand placed" },
-  { value: 120, suffix: "", label: "models matched", note: "On sale now, 2026 prices" },
+  { value: 186, suffix: "", label: "models matched", note: "On sale now, up to 11 crore" },
   { value: 83, suffix: "%", label: "damage accuracy", note: "on photos it never trained on" },
   { value: 0, suffix: "", label: "photos uploaded", note: "vision runs on your device" }
 ];

@@ -4,11 +4,10 @@ import { motion } from "framer-motion";
 import MLPanel from "../components/MLPanel";
 import { matchGarageCar } from "../data/garageMatch";
 import { describeAccessory } from "../data/accessories";
+import { money } from "../lib/money";
 
-const lakh = (value) =>
-  value >= 100000
-    ? `₹${(value / 100000).toFixed(value >= 1000000 ? 1 : 2)} L`
-    : `₹${value.toLocaleString("en-IN")}`;
+// Shared, so a crore reads as a crore on every page. See lib/money.js.
+const lakh = money;
 
 const VERDICTS = {
   under: { label: "Priced under", tone: "text-data" },

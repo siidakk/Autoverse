@@ -1,18 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 
 import { recommend, catalogueMeta, apiBaseUrl } from "../lib/api";
+import { budgetsFor, money } from "../lib/money";
 
 // What a buyer can actually say about themselves. The old form asked for
 // horsepower and highway mpg, which is the answer, not the question.
 
-const BUDGETS = [
-  { value: 300000, label: "3L" },
-  { value: 500000, label: "5L" },
-  { value: 800000, label: "8L" },
-  { value: 1200000, label: "12L" },
-  { value: 2000000, label: "20L" },
-  { value: 4000000, label: "40L" }
-];
+// A fallback only, for the moment before /meta answers. The real rungs are
+// worked out from the catalogue's own price range -- see budgetsFor. This list
+// used to be the real one and it ended at forty lakh, which quietly put every
+// car above that out of reach however many of them the data held.
+const BUDGETS = budgetsFor([468500, 4000000]);
 
 // Defaults only. The real lists come from the catalogue itself on mount --
 // see catalogueMeta -- because a hard coded list drifts away from the data
@@ -114,6 +112,7 @@ export default function MLPanel({ onResults }) {
     };
   }, []);
 
+  const budgets = meta?.priceRange ? budgetsFor(meta.priceRange) : BUDGETS;
   const fuels = meta ? ["any", ...meta.fuels] : FUELS;
   const bodies = meta ? ["any", ...meta.bodies] : BODIES;
   const seatCounts = meta?.seats?.length ? meta.seats : SEATS;
@@ -162,12 +161,12 @@ export default function MLPanel({ onResults }) {
     <div>
       <div className="space-y-5">
 
-        <Field label={`Budget — ₹${(budget / 100000).toFixed(0)} lakh`}>
+        <Field label={`Budget — ${money(budget)}`}>
           <Segmented
-            options={BUDGETS}
+            options={budgets}
             value={budget}
             onChange={setBudget}
-            columns={6}
+            columns={5}
           />
         </Field>
 

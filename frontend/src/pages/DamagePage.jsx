@@ -13,11 +13,10 @@ import { valuationOptions, valueCar, describeError } from "../lib/api";
 import { scan as scanWithModel, modelInfo } from "../lib/damageModel";
 import { itemsFromScan, OPPOSITE_END } from "../lib/panels";
 import { likelyCars } from "../lib/carGuess";
+import { money } from "../lib/money";
 
-const rupees = (value) =>
-  value >= 100000
-    ? `₹${(value / 100000).toFixed(2)} L`
-    : `₹${Math.round(value).toLocaleString("en-IN")}`;
+// Shared, so a crore reads as a crore on every page. See lib/money.js.
+const rupees = money;
 
 // The score off the gradient is a ratio without a natural ceiling, so it is
 // shown as a band rather than a number that would look more precise than it is.
