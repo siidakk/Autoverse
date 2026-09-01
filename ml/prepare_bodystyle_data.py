@@ -53,22 +53,30 @@ OUT = HERE / "data" / "bodystyle"
 
 DATASET = "tanganke/stanford_cars"
 
-# Stanford's train half, and only that.
+# The four files with the photographs in.
 #
 # The repository is six gigabytes: as well as train and test it holds seven
 # corrupted copies of the test set -- blurred, pixelated, speckled -- for
 # benchmarking robustness, which are of no use here. load_dataset() fetches the
 # lot, so the files are named explicitly.
 #
-# The test half is left out too. It is another gigabyte for another eight
-# thousand photographs, and this is a seven class problem over a frozen
-# backbone rather than Stanford's 196 class one: eight thousand images is
-# already more than the head needs, and the split it is measured on is carved
-# out of these at training time. Add the test shards here if that stops being
-# true.
+# The test half went in on a second pass, and the reason is a measurement.
+#
+# Trained on the train half alone the head scored 72.4% overall but only 0.44
+# recall on Hatchback -- against 0.91 on Pickup and 0.84 on MPV. Hatchback is
+# the most common body on Indian roads, so the one class that matters most here
+# was the one it was worst at, and it was also the second smallest: 582 images
+# against Sedan's 2,075. Doubling the source roughly doubles the thin classes,
+# which is the cheapest thing available that addresses the actual weakness.
+#
+# The split this is measured on is carved out of the whole lot at training
+# time. Stanford's own train/test division exists so people can compare numbers
+# on their 196 class problem; this is a seven class one and does not need it.
 PARQUET = [
     "data/train-00000-of-00002.parquet",
     "data/train-00001-of-00002.parquet",
+    "data/test-00000-of-00002.parquet",
+    "data/test-00001-of-00002.parquet",
 ]
 ATTRIBUTION = (
     "Stanford Cars (Krause et al., 3D Object Representations for "
@@ -187,6 +195,28 @@ def main():
 
             print(f"\n  {pathlib.Path(filename).name}  "
                   f"{parquet.metadata.num_rows:,} photographs in {groups} groups")
+
+            # Is this file already on disk? Answered by reading the label
+            # column on its own, which is four bytes a row against a quarter of
+            # a megabyte for the picture, so it costs nothing to ask.
+            #
+            # Worth asking because adding the test shards meant a second run,
+            # and without this it re-streamed a gigabyte of train photographs
+            # it already had: decoding every row group in full only to find the
+            # JPEG it would have written was already there.
+            labels = parquet.read(columns=["label"]).column("label").to_pylist()
+            expected = [
+                OUT / bodies[label] / f"{position + row + 1:06d}.jpg"
+                for row, label in enumerate(labels)
+                if bodies[label] is not None
+            ]
+
+            if expected and all(path.exists() for path in expected):
+                print(f"    already have all {len(expected):,} of these")
+                for path in expected:
+                    written[path.parent.name] += 1
+                position += len(labels)
+                continue
 
             for index in range(groups):
                 batch = parquet.read_row_group(index, columns=["image", "label"])

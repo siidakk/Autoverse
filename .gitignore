@@ -33,6 +33,7 @@ backend/.data/
 # that the dataset does not own. None of it is redistributed from here.
 ml/data/
 ml/damage/
+ml/bodystyle/
 
 # Deck QA renders, regenerated from the pptx whenever they are needed
 docs/render/
@@ -44,3 +45,7 @@ docs/*.pdf
 # Intermediate output of build_catalogue.py run on its own. The real
 # artefacts are recommender.pkl and price_model.pkl.
 ml/catalogue_new.pkl
+
+# Scratch photo used to drive the photo pages end to end during development.
+# Not part of the site.
+frontend/public/__test-car.png

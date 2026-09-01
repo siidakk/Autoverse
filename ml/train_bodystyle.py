@@ -70,9 +70,20 @@ SEED = 20260901
 TEST_SHARE = 0.2
 VALID_SHARE = 0.15
 
-# Below this the browser says it is not sure rather than naming a body. A wrong
-# body style quietly steers the whole car guess, so it is better to decline.
-CONFIDENCE_FLOOR = 0.55
+# How often it has to be right, among the answers it does give, before it is
+# allowed to give them. The floor that achieves this is measured on the held
+# out set rather than picked -- see choose_floor.
+#
+# 0.80 because a body style is not the end of the answer here: it steers the
+# shortlist of cars on the repair page, so one wrong shape quietly produces a
+# page of wrong cars. Four right in five is the point where that is worth
+# saying out loud rather than shrugging.
+TARGET_PRECISION = 0.80
+
+# Never demand more confidence than this, however the sweep comes out. Past it
+# the model would be declining on nearly everything, and a classifier that only
+# answers when the answer was obvious is not doing any work.
+MAX_FLOOR = 0.75
 
 SOURCE = (
     "Stanford Cars (Krause et al., ICCV Workshops 2013), "
@@ -190,6 +201,46 @@ def cached_features(backbone, paths):
     return features
 
 
+def choose_floor(confidences, correct):
+    """The lowest confidence at which the model is right often enough.
+
+    Set by hand this was 0.55, which was a number I liked the look of. On the
+    first run that turned out to reject a correct SUV call at 0.43 while a
+    coin-toss between two classes at 0.56 sailed through, which is not a
+    threshold doing any thinking.
+
+    So it is swept instead: for each candidate, how often is the model right
+    when it speaks, and how much does it still speak? The lowest floor that
+    clears TARGET_PRECISION wins, because every point above that is coverage
+    given away for nothing.
+    """
+    best = MAX_FLOOR
+    rows = []
+
+    for floor in np.arange(0.30, MAX_FLOOR + 0.001, 0.05):
+        speaks = confidences >= floor
+        coverage = speaks.mean()
+
+        if coverage < 0.2:
+            # Below this it is declining on four photographs in five, which is
+            # not a feature anybody would keep.
+            break
+
+        precision = correct[speaks].mean() if speaks.any() else 0.0
+        rows.append((floor, precision, coverage))
+
+        if precision >= TARGET_PRECISION and best == MAX_FLOOR:
+            best = float(floor)
+
+    print("\n  Where to stop guessing:")
+    print(f"    {'floor':>7}{'right when it answers':>24}{'answers at all':>17}")
+    for floor, precision, coverage in rows:
+        mark = "  <-- chosen" if abs(floor - best) < 1e-9 else ""
+        print(f"    {floor:>7.2f}{precision:>23.1%}{coverage:>16.1%}{mark}")
+
+    return round(best, 2)
+
+
 def main():
     print("\n  Reading images")
     classes, paths, labels = load_paths()
@@ -246,6 +297,8 @@ def main():
     guessed = predicted.argmax(axis=1)
     accuracy = accuracy_score(test_y, guessed)
 
+    floor = choose_floor(predicted.max(axis=1), guessed == test_y)
+
     print(f"\n  Held out accuracy: {accuracy:.1%} on {len(test_y)} images\n")
     print(classification_report(test_y, guessed, target_names=classes, digits=3))
 
@@ -269,7 +322,7 @@ def main():
         "classes": classes,
         "imageSize": IMAGE_SIZE,
         "accuracy": round(float(accuracy), 4),
-        "confidenceFloor": CONFIDENCE_FLOOR,
+        "confidenceFloor": floor,
         "trainedOn": int(len(train_x)),
         "testedOn": int(len(test_y)),
         "source": SOURCE,

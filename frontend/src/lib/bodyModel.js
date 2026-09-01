@@ -123,14 +123,17 @@ export async function readBody(image, box, onProgress) {
   const scores = tf.tidy(() => {
     // MobileNetV2 wants pixels in -1..1, which is what the training pipeline
     // fed it through preprocess_input.
-    const pixels = tf.browser
-      .fromPixels(canvas)
-      .toFloat()
-      .div(127.5)
-      .sub(1)
-      .expandDims(0);
+    //
+    // Written as function calls rather than chained off the tensor. The
+    // chaining API -- .toFloat().div().sub() -- is registered by the union
+    // @tensorflow/tfjs package, and only tfjs-core is imported here, so
+    // chaining fails at runtime with "toFloat is not a function" once the
+    // weights are actually there to run. damageModel.js already did it this
+    // way; this now matches it.
+    const pixels = tf.browser.fromPixels(canvas);
+    const scaled = tf.sub(tf.div(tf.cast(pixels, "float32"), 127.5), 1);
 
-    return loaded.predict(pixels);
+    return loaded.predict(tf.expandDims(scaled, 0));
   });
 
   const values = Array.from(await scores.data());

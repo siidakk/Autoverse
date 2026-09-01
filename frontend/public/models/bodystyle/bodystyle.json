@@ -1,0 +1,54 @@
+{
+  "classes": [
+    "Convertible",
+    "Coupe",
+    "Hatchback",
+    "MPV",
+    "Pickup",
+    "SUV",
+    "Sedan"
+  ],
+  "imageSize": 224,
+  "accuracy": 0.7238,
+  "confidenceFloor": 0.55,
+  "trainedOn": 5314,
+  "testedOn": 1564,
+  "source": "Stanford Cars (Krause et al., ICCV Workshops 2013), relabelled by body style",
+  "perClass": {
+    "Convertible": {
+      "precision": 0.788,
+      "recall": 0.667,
+      "support": 201
+    },
+    "Coupe": {
+      "precision": 0.646,
+      "recall": 0.671,
+      "support": 283
+    },
+    "Hatchback": {
+      "precision": 0.398,
+      "recall": 0.44,
+      "support": 116
+    },
+    "MPV": {
+      "precision": 0.759,
+      "recall": 0.842,
+      "support": 101
+    },
+    "Pickup": {
+      "precision": 0.837,
+      "recall": 0.914,
+      "support": 152
+    },
+    "SUV": {
+      "precision": 0.823,
+      "recall": 0.77,
+      "support": 296
+    },
+    "Sedan": {
+      "precision": 0.731,
+      "recall": 0.735,
+      "support": 415
+    }
+  }
+}
