@@ -20,6 +20,9 @@
 // How much weight each signal carries. Body dominates because it is the one
 // thing an actual model was trained to answer.
 const WEIGHT = {
+  // The badge, when it is legible, is worth more than everything else put
+  // together: a white SUV is seventy four cars, a white *Toyota* SUV is four.
+  make: 2.5,
   body: 1.0,
   size: 0.35,
   popularity: 0.25
@@ -84,15 +87,24 @@ export function likelyCars(models, seen = {}, limit = 4) {
       const body = bodyScore(seen.body, entry.body) * WEIGHT.body;
       const size = sizeScore(seen.shareOfFrame, entry.length) * WEIGHT.size;
 
+      // No opinion on the make scores neutral, so a car is never punished for
+      // the classifier having declined -- which it does often, and correctly,
+      // on the thirteen Indian brands it was never shown.
+      const badge = !seen.make
+        ? 0.5 * WEIGHT.make
+        : (entry.brand === seen.make ? 1 : 0) * WEIGHT.make;
+
       // Nothing here knows what people actually own, so price stands in for it
       // upside down: the cheaper half of the catalogue is most of the cars on
       // the road. It only ever breaks ties.
       const common = (1 - (entry.typical || 0) / biggest) * WEIGHT.popularity;
 
-      return { entry, score: body + size + common };
+      return { entry, score: badge + body + size + common };
     })
     // A car whose body is flatly wrong is not a candidate, however cheap.
     .filter((row) => !seen.body || bodyScore(seen.body, row.entry.body) > 0)
+    // Nor is one wearing a different badge, when the badge was read.
+    .filter((row) => !seen.make || row.entry.brand === seen.make)
     .sort((a, b) => b.score - a.score);
 
   return ranked.slice(0, limit).map((row) => row.entry);

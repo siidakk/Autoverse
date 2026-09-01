@@ -266,15 +266,36 @@ export default function DetectPage() {
             >
               <div className="panel hud-frame p-6">
                 <p className="label">Found</p>
-                <p className="mt-2 text-2xl font-medium tracking-tight capitalize">
-                  {result.body ?? "A car"}
+                <p className="mt-2 text-2xl font-medium tracking-tight">
+                  {/* The badge first when it was legible, because "Toyota SUV"
+                      is a car and "SUV" is a shape. */}
+                  {result.make ? `${result.make} ` : ""}
+                  <span className="capitalize">
+                    {result.body ?? (result.make ? "" : "A car")}
+                  </span>
                 </p>
                 <p className="readout mt-1 text-[11px] text-fog">
                   detected as {result.label} · {Math.round(result.confidence * 100)}% sure
                   {result.bodySource === "model" && result.bodyConfidence != null && (
                     <> · shape {Math.round(result.bodyConfidence * 100)}% sure</>
                   )}
+                  {result.make && result.makeConfidence != null && (
+                    <> · badge {Math.round(result.makeConfidence * 100)}% sure</>
+                  )}
                 </p>
+
+                {/* The badge reader has never seen a Maruti Suzuki, a Tata, a
+                    Mahindra or a Kia -- between them most of what is on the
+                    road in India. When it declines, that silence is doing its
+                    job, and saying so is better than leaving a gap the reader
+                    has to interpret. */}
+                {!result.make && (
+                  <p className="mt-3 text-xs leading-relaxed text-fog/80">
+                    No badge called. It only knows the makes it was trained on,
+                    which leaves out Maruti Suzuki, Tata, Mahindra and Kia — so
+                    on most Indian cars saying nothing is the right answer.
+                  </p>
+                )}
 
                 {/* Not every class is equally reliable, and one overall
                     accuracy hides that. It is right about a pickup nine times

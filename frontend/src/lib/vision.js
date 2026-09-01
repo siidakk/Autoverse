@@ -10,6 +10,7 @@
 // different piece of work and a different dataset.
 
 import { readBody } from "./bodyModel";
+import { readMake } from "./makeModel";
 import { atNaturalSize } from "./imageSource";
 
 let detector = null;
@@ -78,11 +79,17 @@ async function loadDetector(onProgress) {
 
 const VEHICLES = ["car", "truck", "bus"];
 
-// A truck in this detector's vocabulary covers pickups and vans; a bus covers
-// anything long with a tall flat side, which for our purposes is an MPV. These
-// two the detector really does know, so they stand. `car` is left out on
-// purpose: it covers every shape from an Alto to an SL63 and says nothing
-// about which, so the classifier answers that one.
+// What the detector's own class is worth, and it is not much.
+//
+// COCO has eighty everyday objects and three of them are vehicles. "truck"
+// covers a pickup, a lorry and -- routinely -- any large SUV, which is how a
+// Toyota Fortuner came back labelled Pickup with 94% confidence next to a
+// photograph of an SUV. Worse, this map used to be consulted *instead of* the
+// classifier for anything not called "car", so the one model actually trained
+// to tell an SUV from a pickup was skipped on precisely the vehicles it was
+// needed for.
+//
+// These are fallbacks now, used only when the classifier declines.
 const BODY_FROM_CLASS = {
   truck: "Pickup",
   bus: "MPV"
@@ -242,22 +249,33 @@ export async function inspectPhoto(image, onProgress) {
   // car from anything but "model".
   const ratio = width / Math.max(height, 1);
 
-  let body = BODY_FROM_CLASS[best.class] ?? null;
-  let bodySource = best.class === "car" ? null : "detector";
+  let body = null;
+  let bodySource = null;
   let bodyConfidence = null;
   let bodyRecall = null;
 
-  if (best.class === "car") {
-    onProgress?.("Reading the shape");
-    const read = await readBody(source, best.bbox, onProgress);
+  // The classifier gets asked about every vehicle, not just the ones COCO
+  // happens to call a car.
+  onProgress?.("Reading the shape");
+  const read = await readBody(source, best.bbox, onProgress);
 
-    if (read?.body) {
-      body = read.body;
-      bodySource = "model";
-      bodyConfidence = read.confidence;
-      bodyRecall = read.recall;
-    }
+  if (read?.body) {
+    body = read.body;
+    bodySource = "model";
+    bodyConfidence = read.confidence;
+    bodyRecall = read.recall;
+  } else if (BODY_FROM_CLASS[best.class]) {
+    // It declined, so fall back to the detector's coarse word rather than to
+    // nothing -- but say where the answer came from.
+    body = BODY_FROM_CLASS[best.class];
+    bodySource = "detector";
   }
+
+  // And whose car it is, which is the half that turns a shape into a name.
+  // Null until the model is built, and null again whenever it is not sure --
+  // which for an Indian car it very often should be, since it has never seen a
+  // Maruti, a Tata, a Mahindra or a Kia. See makeModel.js.
+  const badge = await readMake(source, best.bbox, onProgress);
 
   return {
     found: true,
@@ -268,6 +286,9 @@ export async function inspectPhoto(image, onProgress) {
     bodySource,
     bodyConfidence,
     bodyRecall,
+    make: badge?.make ?? null,
+    makeConfidence: badge?.confidence ?? null,
+    makeRecall: badge?.recall ?? null,
     ratio,
     paint,
     colourName: nameColour(paint.hex),
