@@ -1,10 +1,20 @@
-"""Turns the VariantWise catalogue into the table the recommender trains on.
+"""Builds the table the recommender trains on, out of two sources.
 
     python build_catalogue.py
 
-Source: https://huggingface.co/datasets/variantwise/indian-cars-variants
+The bulk of it: https://huggingface.co/datasets/variantwise/indian-cars-variants
 Licence: CC BY 4.0 -- free to use and build on, including commercially, with
 attribution to VariantWise (https://variantwise.com).
+
+The top of the market comes from curated_catalogue.py instead, and is written
+by hand. VariantWise covers 120 cars across fifteen mass-market brands and has
+no BMW, Mercedes-Benz, Audi, Volvo, Lexus, Porsche, Jaguar or Land Rover in it
+at all -- three cars in total above a crore -- while the configurator renders a
+G-Class, an SL 63, a 911 and two Lamborghinis. No open dataset fills that in;
+searching found none with Indian prices, and the one large specification
+database carries no prices at all. So a third of the market was either going to
+be missing or hand written, and every hand written row is marked source
+"Curated" so the difference reaches the page rather than being smoothed over.
 
 Why this replaced what was here
 -------------------------------
@@ -48,8 +58,13 @@ import json
 import pandas as pd
 from huggingface_hub import hf_hub_download
 
+from curated_catalogue import SOURCE as CURATED_SOURCE, rows as curated_rows
+
 DATASET = "variantwise/indian-cars-variants"
 ATTRIBUTION = "VariantWise (https://variantwise.com), CC BY 4.0"
+
+# What the hand written half is, said in the same breath as the licensed half.
+CURATED = CURATED_SOURCE
 
 # One horsepower metric is not another. The rest of the app talks in bhp.
 PS_TO_BHP = 0.98632
@@ -241,6 +256,16 @@ def build():
             "year": int(as_of[:4]) if as_of[:4].isdigit() else 2026,
             "year_typical": int(as_of[:4]) if as_of[:4].isdigit() else 2026,
         })
+
+    # Everything above forty lakh, which this dataset does not carry: no BMW,
+    # no Mercedes-Benz, no Audi, and three cars in total above a crore. Those
+    # are written down by hand in curated_catalogue.py, and are marked as such
+    # on every row so the page can tell a licensed figure from an approximate
+    # one.
+    for row in rows:
+        row["source"] = "VariantWise"
+
+    rows.extend(curated_rows())
 
     catalogue = pd.DataFrame(rows)
     catalogue["listings"] = catalogue["variants"]

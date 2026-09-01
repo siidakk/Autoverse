@@ -11,6 +11,7 @@ picked, because a recommendation nobody can question is not much use.
 """
 
 import math
+from datetime import date
 from pathlib import Path
 
 import joblib
@@ -28,10 +29,31 @@ valuation = joblib.load(BASE_DIR / "valuation.pkl")
 catalogue = bundle["catalogue"]
 scaler = bundle["scaler"]
 FEATURES = bundle["features"]
-# The year range on the valuation form describes the used listings, so it comes
-# from that model's own bundle rather than from the new-car catalogue, which
-# only ever contains this year.
-LATEST_YEAR = valuation["latest_year"]
+# The year the listings were collected. It is a fact about the training data
+# and nothing else -- specifically, it is not the newest car anybody can value.
+LISTINGS_YEAR = valuation["latest_year"]
+
+# What the model actually consumes is age, not a calendar year, and it learned
+# ages nought to twenty-five. A 2024 car in 2026 is two years old, which is the
+# best represented part of that range.
+#
+# The form was capped at LISTINGS_YEAR, so in 2026 the newest car you could ask
+# about was a 2020. That was the collection date leaking into the interface and
+# pretending to be a limit on the model.
+THIS_YEAR = date.today().year
+OLDEST_YEAR = THIS_YEAR - 30
+
+# The catalogue says "Maruti Suzuki"; the 2020 listings said "Maruti". Sending
+# the wrong one is silent -- the encoder shrugs at an unknown category, the
+# brand contributes nothing, and the valuation moves by about seven percent
+# with nothing on screen to say why.
+BRAND_ALIASES = {
+    "Maruti Suzuki": "Maruti",
+    "Land Rover": "Land",
+    "Mercedes-Benz": "Mercedes-Benz",
+}
+
+KNOWN_BRANDS = set(valuation["brands"])
 
 from accessories import accessories_for
 
@@ -345,6 +367,18 @@ def recommend():
 
 # ---------------------------------------------------------------- valuation
 
+def listings_brand(name):
+    """The brand under the name the 2020 listings used.
+
+    They recorded the first word of the model name, so a Maruti Suzuki Swift
+    was filed as "Maruti" and a Land Rover as "Land". The catalogue spells both
+    out in full, and handing the full name to the model is not an error anybody
+    sees -- it is just a category the encoder has never met, silently worth
+    nothing.
+    """
+    return BRAND_ALIASES.get(name, name)
+
+
 def valuation_frame(data, age=None, km=None):
     """One row in the shape the valuation model was trained on."""
     return pd.DataFrame([{
@@ -354,7 +388,7 @@ def valuation_frame(data, age=None, km=None):
         "engine": float(data["engine"]),
         "mileage_kmpl": float(data["mileage"]),
         "seats": float(data["seats"]),
-        "brand": data["brand"],
+        "brand": listings_brand(data["brand"]),
         "fuel": data["fuel"],
         "transmission": data["transmission"],
         "owner": data["owner"],
@@ -381,6 +415,14 @@ def valuation_options():
                 # came from the manufacturer or from the car's peers.
                 "mileage": round(float(row["mileage_ranked"]), 1),
                 "mileageKnown": bool(row["economy_known"]),
+                # Whether the resale model has any business answering about
+                # this car at all. It learned from 2020 listings that topped
+                # out around a crore and never contained a Porsche, a Ferrari
+                # or a BYD, so for those it would be extrapolating well past
+                # anything it has seen -- which it will do silently and
+                # confidently if nobody says otherwise.
+                "brandKnown": listings_brand(row["brand"]) in KNOWN_BRANDS,
+                "withinRange": bool(row["price"] <= 10000000),
                 "seats": int(row["seats"]),
                 "fuels": list(row["fuels"]),
                 "transmissions": list(row["transmissions"]),
@@ -395,7 +437,13 @@ def valuation_options():
         ],
         "owners": valuation["owners"],
         "sellers": ["Individual", "Dealer", "Trustmark Dealer"],
-        "years": [1995, LATEST_YEAR],
+        # The years somebody could be selling in, not the year the listings
+        # stopped. See THIS_YEAR.
+        "years": [OLDEST_YEAR, THIS_YEAR],
+        # What money the answers are in, so the page can say so rather than
+        # quietly presenting 2020 rupees as today's.
+        "basisYear": LISTINGS_YEAR,
+        "knownBrands": sorted(KNOWN_BRANDS),
         "accuracy": {
             "chosen": valuation["chosen"],
             "r2": round(valuation["metrics"][valuation["chosen"]]["r2"], 3),

@@ -98,6 +98,17 @@ export default function ValuationPage() {
           its age, distance, owners and specification. Answers come as a range,
           because a figure quoted to the rupee would be pretending.
         </p>
+        {/* The listings are from 2020 and no newer Indian set exists publicly,
+            so the model answers in 2020 money. Age is what it actually reads,
+            and it learned ages nought to twenty-five, so a 2024 car is a fair
+            question -- the answer is simply denominated six years ago. Saying
+            that is the difference between a limitation and a wrong number. */}
+        <p className="mt-4 max-w-xl text-xs leading-relaxed text-fog/80">
+          One thing to hold in mind: the listings behind it were collected in
+          2020, so the figures are in 2020 rupees. What it knows well is how a
+          car loses value with age, distance and owners — not what six years of
+          the market have done to the price on top of that.
+        </p>
         <div className="tick-rule mt-8 opacity-70" />
       </header>
 
@@ -154,6 +165,22 @@ export default function ValuationPage() {
                     {car.mileageKnown ? "" : "~"}{car.mileage} kmpl
                   </span>{" "}
                   · {car.seats} seats
+                </p>
+              )}
+
+              {/* The resale model learned from 2020 listings. Those contained
+                  no Porsche, no BYD and nothing near a crore, so for those
+                  cars it is extrapolating well past anything it has seen --
+                  which it will do silently and confidently unless the page
+                  says otherwise. */}
+              {car && (!car.brandKnown || !car.withinRange) && (
+                <p className="border-l-2 border-signal-deep pl-3 text-xs leading-relaxed text-fog">
+                  {!car.brandKnown && !car.withinRange
+                    ? `The resale model has never seen a ${car.brand}, or any car near this price.`
+                    : !car.brandKnown
+                      ? `The resale model has never seen a ${car.brand} — it learned from 2020 listings, and this brand was not selling here then.`
+                      : "This is priced well above anything in the resale model's training data."}
+                  {" "}Take the number as a shape, not a quote.
                 </p>
               )}
 
@@ -283,7 +310,9 @@ export default function ValuationPage() {
                 className="space-y-6"
               >
                 <div className="panel hud-frame p-8">
-                  <p className="label">Estimated value</p>
+                  <p className="label">
+                    Estimated value{options.basisYear ? ` — in ${options.basisYear} rupees` : ""}
+                  </p>
                   <p className="readout mt-3 text-5xl text-signal">
                     {rupees(result.estimate)}
                   </p>
