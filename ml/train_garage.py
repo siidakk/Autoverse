@@ -66,13 +66,33 @@ OTHER = HERE / "data" / "bodystyle"
 OTHER_LABEL = "other"
 OTHER_COUNT = 3000
 
-# Renders are clean and a frozen backbone would let the head separate them on
-# cues a photograph will not have. The backbone's last block is unfrozen so the
-# features themselves adapt, which is what makes the difference between
-# learning these fifteen cars and learning fifteen renderings.
-UNFREEZE_FROM = 100
+# Renders are clean and a fully frozen backbone would let the head separate
+# them on cues a photograph will not have, so the top of the backbone is
+# unfrozen and the features themselves adapt.
+#
+# Only the top, though. This machine has 7.7 GB of memory and training died
+# twice at UNFREEZE_FROM 100 -- backpropagating through half of MobileNetV2
+# holds every intermediate activation for the backward pass, and that is what
+# ran out. Unfreezing from 130 trains roughly the last twenty five layers,
+# which is where the car-shaped features live anyway, and costs a fraction of
+# the memory and time.
+UNFREEZE_FROM = 130
 
 EPOCHS = 24
+
+# Smaller than the other trainers use, because this one is the only one that
+# backpropagates through the backbone and that is where the memory goes.
+#
+# It ran out twice at 32, both times deep into training and both times with the
+# same error out of oneDNN's convolution-gradient kernel: "could not create a
+# memory object". The first death looked like an external kill and I wrongly
+# said so; the second showed the traceback.
+GARAGE_BATCH = 16
+
+# Saved every time it improves, so a crash costs one epoch rather than the
+# whole run. Twice now, seventy minutes of training has evaporated at 99.6%
+# validation with nothing on disk to show for it.
+CHECKPOINT = OUT / "best.keras" 
 
 
 def load_paths():
@@ -177,7 +197,7 @@ def pipeline(paths, labels, training):
         ),
         num_parallel_calls=tf.data.AUTOTUNE,
     )
-    return data.batch(BATCH).prefetch(tf.data.AUTOTUNE)
+    return data.batch(GARAGE_BATCH).prefetch(tf.data.AUTOTUNE)
 
 
 def build(classes):
@@ -220,6 +240,7 @@ def main():
           f"{len(test_paths)} test, {len(classes)} cars")
 
     limit_threads()
+    OUT.mkdir(parents=True, exist_ok=True)
 
     model = build(classes)
     model.compile(
@@ -244,7 +265,11 @@ def main():
         callbacks=[
             tf.keras.callbacks.EarlyStopping(
                 monitor="val_accuracy", patience=5, restore_best_weights=True
-            )
+            ),
+            tf.keras.callbacks.ModelCheckpoint(
+                str(CHECKPOINT), monitor="val_accuracy",
+                save_best_only=True, verbose=0
+            ),
         ],
         verbose=2,
     )

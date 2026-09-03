@@ -1,0 +1,112 @@
+{
+  "classes": [
+    "audi-r8",
+    "bmw-m4",
+    "chevrolet-corvette-c8",
+    "honda-city",
+    "honda-civic",
+    "jeep-wrangler-rubicon",
+    "lamborghini-aventador",
+    "lamborghini-revuelto",
+    "mercedes-benz-sl63-amg",
+    "mercedes-g-class",
+    "nissan-gt-r",
+    "porsche-911",
+    "toyota-fortuner",
+    "toyota-gr-supra",
+    "toyota-hilux",
+    "other"
+  ],
+  "imageSize": 224,
+  "accuracy": 0.9987,
+  "confidenceFloor": 0.3,
+  "trainedOn": 5100,
+  "testedOn": 1500,
+  "source": "Rendered from this project's own car models, plus Stanford Cars as negatives",
+  "measuredOn": "renders for the cars, real photographs for 'other'",
+  "targetPrecision": 0.8,
+  "maxFloor": 0.75,
+  "batch": 16,
+  "perClass": {
+    "audi-r8": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 60
+    },
+    "bmw-m4": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 60
+    },
+    "chevrolet-corvette-c8": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 60
+    },
+    "honda-city": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 60
+    },
+    "honda-civic": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 60
+    },
+    "jeep-wrangler-rubicon": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 60
+    },
+    "lamborghini-aventador": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 60
+    },
+    "lamborghini-revuelto": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 60
+    },
+    "mercedes-benz-sl63-amg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 60
+    },
+    "mercedes-g-class": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 60
+    },
+    "nissan-gt-r": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 60
+    },
+    "porsche-911": {
+      "precision": 0.984,
+      "recall": 1.0,
+      "support": 60
+    },
+    "toyota-fortuner": {
+      "precision": 0.984,
+      "recall": 1.0,
+      "support": 60
+    },
+    "toyota-gr-supra": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 60
+    },
+    "toyota-hilux": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 60
+    },
+    "other": {
+      "precision": 1.0,
+      "recall": 0.997,
+      "support": 600
+    }
+  }
+}

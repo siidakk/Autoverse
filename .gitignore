@@ -52,3 +52,5 @@ ml/catalogue_new.pkl
 # Not part of the site.
 frontend/public/__test-car.png
 frontend/public/__test-car-small.jpg
+frontend/public/__test-fortuner.jpg
+frontend/public/__test-gclass.jpg
