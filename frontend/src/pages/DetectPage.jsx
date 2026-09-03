@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { inspectPhoto, warmDetector, detectorState, MODEL_SIZE_MB } from "../lib/vision";
-import { matchGarageBody } from "../data/garageMatch";
+import { garageCarsByBody } from "../data/garageMatch";
 
 // Photo of a car, in. The closest thing we can actually show you, out, painted
 // the colour yours is. This is the way into the configurator for somebody who
@@ -95,9 +95,18 @@ export default function DetectPage() {
     }
   };
 
-  // Only when the shape is actually known. Opening "the closest car to a
-  // null" would be the old behaviour wearing a new coat.
-  const match = result?.body ? matchGarageBody(result.body) : null;
+  // Every car we model of that shape, not one picked off the front of a list.
+  // The garage holds three SUVs and Identify used to name whichever came first
+  // in the array, which is how a photograph of a Fortuner produced "Mercedes
+  // G-Class" while a Fortuner sat two entries below it.
+  const options = result?.body ? garageCarsByBody(result.body) : null;
+  const choices = options ? (options.exact.length ? options.exact : options.near) : [];
+  const exact = Boolean(options?.exact.length);
+
+  // Chosen by the person looking at their own car, which is the one method
+  // here with no error rate.
+  const [picked, setPicked] = useState(null);
+  const chosen = choices.find((car) => car.id === picked) ?? choices[0] ?? null;
 
   return (
     <div className="mx-auto max-w-[1500px] px-5 py-14 md:px-8">
@@ -318,20 +327,53 @@ export default function DetectPage() {
                 </div>
               </div>
 
-              {match && (
+              {chosen && (
                 <div className="panel p-6">
-                  <p className="label">Closest car we model</p>
-                  <p className="mt-2 text-lg font-medium tracking-tight">
-                    {match.car.name}
-                  </p>
-                  <p className="mt-1 text-xs text-fog">
-                    {match.exact
-                      ? `Also a ${result.body.toLowerCase()}`
-                      : `Nearest shape to a ${result.body.toLowerCase()}`}
+                  <p className="label">
+                    {exact
+                      ? `${choices.length > 1 ? `${choices.length} cars` : "The car"} we model with this shape`
+                      : "Nearest shape we model"}
                   </p>
 
+                  {choices.length > 1 ? (
+                    <>
+                      <p className="mt-2 text-xs leading-relaxed text-fog">
+                        It reads the shape and the paint, not the badge — so
+                        pick yours and it opens in your colour.
+                      </p>
+                      <div className="mt-3 grid gap-px bg-line-soft">
+                        {choices.map((car) => (
+                          <button
+                            key={car.id}
+                            type="button"
+                            onClick={() => setPicked(car.id)}
+                            className={[
+                              "px-3 py-2.5 text-left text-sm transition-colors",
+                              car.id === chosen?.id
+                                ? "bg-signal text-ink"
+                                : "bg-ink text-fog hover:text-chalk"
+                            ].join(" ")}
+                          >
+                            {car.name}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-2 text-lg font-medium tracking-tight">
+                        {chosen?.name}
+                      </p>
+                      <p className="mt-1 text-xs text-fog">
+                        {exact
+                          ? `Also a ${result.body.toLowerCase()}`
+                          : `Nearest shape to a ${result.body.toLowerCase()}`}
+                      </p>
+                    </>
+                  )}
+
                   <Link
-                    to={`/customise?car=${match.car.id}&colour=${encodeURIComponent(result.paint.hex)}`}
+                    to={`/customise?car=${chosen.id}&colour=${encodeURIComponent(result.paint.hex)}`}
                     className="btn btn-signal mt-5 w-full"
                   >
                     Open it in your colour

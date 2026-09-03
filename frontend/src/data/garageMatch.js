@@ -27,6 +27,26 @@ export function garageCarById(id) {
 }
 
 /**
+ * Every garage car of a given body, exact matches first.
+ *
+ * Identify used to take the first match and present it as "closest car we
+ * model", which for an SUV meant the G-Class every time -- even though the
+ * garage holds a Fortuner and a Wrangler too, and the photograph that prompted
+ * this was a Fortuner. Picking arbitrarily and then stating it with a
+ * confident label is worse than offering the three and letting somebody point.
+ *
+ * No model is needed to know which cars share a shape, and none is used.
+ */
+export function garageCarsByBody(body) {
+  const exact = cars.filter((car) => car.bodyStyle === body);
+  const near = (BODY_FALLBACK[body] ?? []).flatMap((fallback) =>
+    cars.filter((car) => car.bodyStyle === fallback)
+  );
+
+  return { exact, near };
+}
+
+/**
  * The closest garage car to a body style on its own.
  *
  * Used by Identify, which has a shape from the classifier and no brand. It had
