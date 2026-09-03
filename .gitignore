@@ -35,6 +35,7 @@ ml/data/
 ml/damage/
 ml/bodystyle/
 ml/make/
+ml/garage/
 
 # Deck QA renders, regenerated from the pptx whenever they are needed
 docs/render/

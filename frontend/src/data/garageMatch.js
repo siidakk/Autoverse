@@ -15,6 +15,17 @@ const BODY_FALLBACK = {
   Convertible: ["Coupe"]
 };
 
+// The id the renderer used for each car's folder, so a prediction coming back
+// as "toyota-fortuner" can be turned into the car itself. Derived rather than
+// written down, because a second hand-kept list of these fifteen names is one
+// more thing to drift.
+const slug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+/** The garage car a recognised id refers to, or null if it is not one of ours. */
+export function garageCarById(id) {
+  return cars.find((car) => slug(car.name) === id) ?? null;
+}
+
 /**
  * The closest garage car to a body style on its own.
  *

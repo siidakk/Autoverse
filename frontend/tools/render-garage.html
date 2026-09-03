@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Garage renderer</title>
+    <style>
+      body { margin: 0; background: #111; color: #ccc; font: 13px monospace; }
+      #stage { display: block; margin: 12px auto; border: 1px solid #333; }
+      #log { padding: 8px 12px; }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage" width="448" height="448"></canvas>
+    <div id="log">idle</div>
+
+    <script type="module">
+      //
+      // Renders the garage's own cars, from every angle, as training data.
+      //
+      // The point: no public dataset can name an Indian car from a photograph,
+      // but this project already owns fifteen cars as 3D models -- including
+      // the Fortuner that started this -- and a model you own can be
+      // photographed as many times as you like, from anywhere, perfectly
+      // labelled. That is the one route to naming actual cars that does not
+      // depend on data nobody has published.
+      //
+      // The honest risk, stated up front: these are renders, not photographs.
+      // A classifier trained on clean geometry may not survive a real camera,
+      // real light and a real background. Everything varied below -- angle,
+      // elevation, distance, lighting, background -- is there to narrow that
+      // gap, and the training script adds colour and blur on top. Whether it
+      // was enough is a question for the held-out numbers, not for this file.
+      //
+      // Driven by render-garage.mjs, which calls window.shoot() and saves what
+      // comes back.
+      //
+      import * as THREE from "three";
+      import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+      import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
+
+      const canvas = document.getElementById("stage");
+      const log = (text) => { document.getElementById("log").textContent = text; };
+
+      // Rendered larger than it is saved, so cropping into the frame still
+      // leaves enough pixels to be worth training on.
+      const RENDER = 448;
+      const OUTPUT = 256;
+
+      const out = document.createElement("canvas");
+      const outContext = out.getContext("2d");
+
+      const renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        preserveDrawingBuffer: true
+      });
+      renderer.setPixelRatio(1);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
+      const loader = new GLTFLoader();
+      // The models are meshopt compressed -- drei wires this up for the app,
+      // and a bare GLTFLoader will not open them without it.
+      loader.setMeshoptDecoder(MeshoptDecoder);
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 200);
+
+      const hemi = new THREE.HemisphereLight(0xffffff, 0x444455, 1);
+      const key = new THREE.DirectionalLight(0xffffff, 2);
+      const rim = new THREE.DirectionalLight(0xffffff, 1);
+      scene.add(hemi, key, rim);
+
+      let current = null;
+      let radius = 3;
+
+      const random = (low, high) => low + Math.random() * (high - low);
+
+      /** Loads one car and frames it. */
+      window.loadCar = async (url) => {
+        if (current) {
+          scene.remove(current);
+          current.traverse((child) => {
+            if (child.isMesh) {
+              child.geometry?.dispose?.();
+              const materials = Array.isArray(child.material) ? child.material : [child.material];
+              materials.forEach((material) => material?.dispose?.());
+            }
+          });
+        }
+
+        const gltf = await loader.loadAsync(url);
+        current = gltf.scene;
+
+        // Centred on the origin and scaled to a common size, so the classifier
+        // cannot cheat by learning that one car's file happens to be modelled
+        // larger than another's. These files disagree wildly about units: the
+        // Fortuner is 4.7 long, the Civic 624.
+        //
+        // The centring and the scaling go on *different* objects, and that is
+        // the whole trick. Three.js composes a local matrix as translate then
+        // rotate then scale, so setting both on one object maps a point to
+        // s*p - centre and leaves the car sitting at minus its own centre. The
+        // Civic ended up 198 units off screen and the Porsche 620, which is
+        // why exactly the three models with a large centre rendered as empty
+        // frames while the twelve centred near the origin looked fine.
+        const box = new THREE.Box3().setFromObject(current);
+        const size = box.getSize(new THREE.Vector3());
+        const centre = box.getCenter(new THREE.Vector3());
+        const scale = 2 / Math.max(size.x, size.y, size.z);
+
+        // Inner object carries the offset, in the model's own units.
+        current.position.sub(centre);
+
+        // Outer group carries the scale, applied to an already centred car.
+        const wrapper = new THREE.Group();
+        wrapper.add(current);
+        wrapper.scale.setScalar(scale);
+
+        current = wrapper;
+        scene.add(current);
+
+        radius = 3.2;
+        log(`loaded ${url}`);
+        return true;
+      };
+
+      /**
+       * One render, from a random viewpoint under random light on a random
+       * ground. Returns a JPEG data URL.
+       */
+      window.shoot = () => {
+        // Right the way round, because a photograph can be taken from anywhere.
+        const azimuth = random(0, Math.PI * 2);
+        // From knee height to a little above the roof -- the range a person
+        // holding a phone actually covers.
+        const elevation = random(-0.05, 0.45);
+        const distance = radius * random(0.9, 1.6);
+
+        camera.fov = random(28, 55);
+        camera.position.set(
+          Math.cos(azimuth) * Math.cos(elevation) * distance,
+          Math.sin(elevation) * distance + 0.15,
+          Math.sin(azimuth) * Math.cos(elevation) * distance
+        );
+        camera.lookAt(0, random(-0.1, 0.1), 0);
+        camera.updateProjectionMatrix();
+
+        // Light from somewhere different every time, and sometimes flat and
+        // grey the way an overcast car park is.
+        const overcast = Math.random() < 0.3;
+        hemi.intensity = overcast ? random(1.4, 2.2) : random(0.5, 1.1);
+        key.intensity = overcast ? random(0.3, 0.9) : random(1.6, 3.4);
+        rim.intensity = random(0.2, 1.6);
+
+        const keyAngle = random(0, Math.PI * 2);
+        key.position.set(Math.cos(keyAngle) * 5, random(2, 7), Math.sin(keyAngle) * 5);
+        rim.position.set(Math.cos(keyAngle + 2.4) * 5, random(0.5, 3), Math.sin(keyAngle + 2.4) * 5);
+
+        // A plain but varied ground and sky. Not a photograph, but it stops
+        // every frame sharing one background, which a classifier would happily
+        // latch onto instead of the car.
+        const hue = Math.random();
+        const light = random(0.12, 0.85);
+        scene.background = new THREE.Color().setHSL(hue, random(0, 0.25), light);
+
+        renderer.setSize(RENDER, RENDER, false);
+        renderer.render(scene, camera);
+
+        // Cropped to the car, because that is what the classifier will be given.
+        //
+        // At inference the detector hands over a tight box around the vehicle
+        // and the crop is stretched to a square. Training on frames that are
+        // mostly background would teach the model to expect a car occupying a
+        // fifth of the picture, and then show it one occupying all of it.
+        //
+        // The margin varies because a detector's box is not exact either.
+        const region = projectedBox();
+        const margin = random(0.02, 0.16);
+        const padX = region.width * margin;
+        const padY = region.height * margin;
+
+        const left = Math.max(0, region.x - padX);
+        const top = Math.max(0, region.y - padY);
+        const right = Math.min(RENDER, region.x + region.width + padX);
+        const bottom = Math.min(RENDER, region.y + region.height + padY);
+
+        out.width = OUTPUT;
+        out.height = OUTPUT;
+        outContext.drawImage(
+          canvas,
+          left, top, Math.max(1, right - left), Math.max(1, bottom - top),
+          0, 0, OUTPUT, OUTPUT
+        );
+
+        return out.toDataURL("image/jpeg", 0.86);
+      };
+
+      /** Where the car lands on screen, as a pixel rectangle. */
+      function projectedBox() {
+        const box = new THREE.Box3().setFromObject(current);
+
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+
+        // All eight corners, because a rotated box's screen extent is not the
+        // projection of two opposite corners.
+        for (let i = 0; i < 8; i += 1) {
+          const corner = new THREE.Vector3(
+            i & 1 ? box.max.x : box.min.x,
+            i & 2 ? box.max.y : box.min.y,
+            i & 4 ? box.max.z : box.min.z
+          ).project(camera);
+
+          const x = (corner.x * 0.5 + 0.5) * RENDER;
+          const y = (-corner.y * 0.5 + 0.5) * RENDER;
+
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
+
+        return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+      }
+
+      /**
+       * What was actually loaded, so a car that renders as an empty frame can
+       * be told apart from one that renders badly. Three of the fifteen came
+       * back blank on the first run and this is how they were diagnosed.
+       */
+      window.inspect = async (url) => {
+        const gltf = await loader.loadAsync(url);
+        const box = new THREE.Box3().setFromObject(gltf.scene);
+        const size = box.getSize(new THREE.Vector3());
+        const centre = box.getCenter(new THREE.Vector3());
+
+        let meshes = 0;
+        let visible = 0;
+        gltf.scene.traverse((child) => {
+          if (!child.isMesh) return;
+          meshes += 1;
+          if (child.visible) visible += 1;
+        });
+
+        return {
+          size: [size.x, size.y, size.z].map((n) => Number(n.toFixed(3))),
+          centre: [centre.x, centre.y, centre.z].map((n) => Number(n.toFixed(3))),
+          finite: [size.x, size.y, size.z].every(Number.isFinite),
+          meshes,
+          visible,
+          animations: gltf.animations.length
+        };
+      };
+
+      /** How much of the last frame is not flat background. */
+      window.coverage = () => {
+        const probe = document.createElement("canvas");
+        probe.width = 64;
+        probe.height = 64;
+        const context = probe.getContext("2d");
+        context.drawImage(canvas, 0, 0, 64, 64);
+        const { data } = context.getImageData(0, 0, 64, 64);
+
+        const corner = [data[0], data[1], data[2]];
+        let different = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const gap =
+            Math.abs(data[i] - corner[0]) +
+            Math.abs(data[i + 1] - corner[1]) +
+            Math.abs(data[i + 2] - corner[2]);
+          if (gap > 30) different += 1;
+        }
+        return different / (64 * 64);
+      };
+
+      window.rendererReady = true;
+      log("ready");
+    </script>
+  </body>
+</html>
