@@ -245,30 +245,32 @@ export default function DamagePage() {
     );
 
   return (
-    <div className="mx-auto max-w-[1500px] px-5 py-14 md:px-8">
+    // Tighter than the other pages on purpose. This one is a tool rather than
+    // a page to read: the photo, the bill and the resale answer all have to be
+    // visible together, and the resale panel used to start 773 pixels down --
+    // below the fold on any laptop -- because a full-height header sat above
+    // it explaining what the page does.
+    <div className="mx-auto max-w-[1500px] px-5 py-7 md:px-8">
 
-      <header>
+      <header className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <p className="label">05 / Damage</p>
-        <h1 className="mt-4 max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">
+        <h1 className="text-2xl font-semibold tracking-tight">
           What will it cost, and is it worth fixing?
         </h1>
-        <p className="mt-5 max-w-xl text-sm leading-relaxed text-fog">
-          A photo is read by a classifier trained on several thousand
-          photographs of real damage, which names what it finds and says how
-          sure it is. Confirm it, and the repair is costed against what the car
-          is actually worth, so the question of whether to fix it before
-          selling gets a number rather than a shrug.
+        <p className="text-xs text-fog">
+          Damage named by a classifier, costed against what the car is worth.
         </p>
-        <div className="tick-rule mt-8 opacity-70" />
       </header>
 
-      <div className="mt-12 grid gap-10 lg:grid-cols-[1fr_400px]">
+      <div className="tick-rule mt-3 opacity-70" />
+
+      <div className="mt-4 grid gap-5 lg:grid-cols-[1fr_400px]">
 
         {/* THE PHOTO */}
-        <div className="space-y-6">
+        <div className="space-y-3">
           <div
             onClick={() => inputRef.current?.click()}
-            className="grid-veil relative flex min-h-[300px] cursor-pointer items-center justify-center overflow-hidden border border-line-soft p-4"
+            className="grid-veil relative flex min-h-[220px] cursor-pointer items-center justify-center overflow-hidden border border-line-soft p-4"
           >
             {preview ? (
               <div className="relative">
@@ -276,7 +278,7 @@ export default function DamagePage() {
                   ref={imageRef}
                   src={preview}
                   alt="The car being checked"
-                  className="max-h-[440px] w-auto"
+                  className="max-h-[300px] w-auto"
                 />
 
                 {scan?.candidates.map((candidate, index) => (
@@ -373,31 +375,27 @@ export default function DamagePage() {
               <p className="mt-2 text-xs text-fog">{scanError}</p>
             </div>
           )}
-        </div>
-
-        {/* THE BILL */}
-        <div className="space-y-4">
 
           {/* WHAT THE PHOTO FILLED IN, AND HOW MUCH TO TRUST EACH PART */}
           {filled && (filled.panels > 0 || filled.candidates.length > 0) && (
-            <div className="border border-data/40 bg-data/5 px-5 py-4">
+            <div className="border border-data/40 bg-data/5 px-4 py-3">
               <p className="label text-data">Filled in from the photo</p>
 
-              <ul className="mt-3 space-y-2 text-xs leading-relaxed text-fog">
+              {/* Short on purpose. This is a working panel on a page that has
+                  to fit one screen, and the long version of each of these was
+                  three lines of prose explaining what the short version says. */}
+              <ul className="mt-2 space-y-1 text-xs leading-snug text-fog">
                 {filled.panels > 0 && (
                   <li>
                     <span className="text-chalk">
-                      {filled.panels} {filled.panels === 1 ? "repair" : "repairs"} below
+                      {filled.panels} {filled.panels === 1 ? "repair" : "repairs"} found and priced
                     </span>{" "}
-                    — read off the photo and priced already. This is the part worth
-                    trusting: the damage was named by the classifier and placed by
-                    where it falls on the car.
+                    — named by the classifier, placed by where they fall on the car.
                   </li>
                 )}
 
                 {filled.unsure.length > 0 && (
                   <li>
-                    Nothing here detects which way the car is facing, so{" "}
                     {filled.unsure.map((item, index) => (
                       <span key={index}>
                         {index > 0 && ", "}
@@ -407,27 +405,40 @@ export default function DamagePage() {
                         )}
                       </span>
                     ))}
-                    . Worth a glance.
+                    {" "}— nothing detects which way the car faces.
                   </li>
                 )}
 
                 {filled.candidates.length > 0 && (
                   <li>
-                    <span className="text-chalk">The car is a guess.</span> Nothing
-                    can read a badge from a photograph — there is no dataset of
-                    Indian cars by model — so this is the closest match by{" "}
-                    {filled.body ? "body style and size" : "size"}
-                    {filled.colour ? `, in ${filled.colour.toLowerCase()}` : ""}.
-                    If it is wrong, search for yours below; the repairs stay as
-                    they are either way.
+                    <span className="text-chalk">The car is a guess</span> from shape
+                    {filled.colour ? ` and colour (${filled.colour.toLowerCase()})` : " and size"},
+                    never a badge. Change it if it is wrong — the repairs stay.
                   </li>
                 )}
               </ul>
 
+              {/* Correcting it belongs next to the guess, not three panels
+                  further down where it had to be scrolled to. */}
+              {options && (
+                <div className="mt-3">
+                  <CarPicker
+                    models={options.models}
+                    value={selected}
+                    onChange={setSelected}
+                    label="Car"
+                  />
+                </div>
+              )}
             </div>
           )}
 
-          <div className="panel p-6">
+        </div>
+
+        {/* THE BILL */}
+        <div className="space-y-3">
+
+          <div className="panel p-4">
             <div className="flex items-center justify-between">
               <p className="label">The damage</p>
               <button
@@ -516,43 +527,46 @@ export default function DamagePage() {
 
           {/* WORTH FIXING? */}
           {options && (
-            <div className="panel p-6">
+            <div className="panel p-4">
               <p className="label">Is it worth fixing before selling</p>
 
-              <div className="mt-4 space-y-3">
-                <CarPicker
-                  models={options.models}
-                  value={selected}
-                  onChange={setSelected}
-                  label="Car"
-                />
+              <div className="mt-3 space-y-2">
+                {/* Only when the photo has not already put one at the top. */}
+                {!filled && (
+                  <CarPicker
+                    models={options.models}
+                    value={selected}
+                    onChange={setSelected}
+                    label="Car"
+                  />
+                )}
 
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="block">
-                    <span className="label">Year {year}</span>
-                    <input
-                      type="range"
-                      className="slider mt-2"
-                      min={options.years[0]}
-                      max={options.years[1]}
-                      value={year}
-                      onChange={(event) => setYear(Number(event.target.value))}
-                    />
-                  </label>
+                {/* Label beside the slider rather than above it: two rows
+                    saved, and the number is next to the thing that sets it. */}
+                <label className="flex items-center gap-3">
+                  <span className="label w-16 shrink-0">{year}</span>
+                  <input
+                    type="range"
+                    className="slider"
+                    min={options.years[0]}
+                    max={options.years[1]}
+                    value={year}
+                    onChange={(event) => setYear(Number(event.target.value))}
+                  />
+                </label>
 
-                  <label className="block">
-                    <span className="label">{(km / 1000).toFixed(0)}k km</span>
-                    <input
-                      type="range"
-                      className="slider mt-2"
-                      min={5000}
-                      max={200000}
-                      step={5000}
-                      value={km}
-                      onChange={(event) => setKm(Number(event.target.value))}
-                    />
-                  </label>
-                </div>
+                <label className="flex items-center gap-3">
+                  <span className="label w-16 shrink-0">{(km / 1000).toFixed(0)}k km</span>
+                  <input
+                    type="range"
+                    className="slider"
+                    min={5000}
+                    max={200000}
+                    step={5000}
+                    value={km}
+                    onChange={(event) => setKm(Number(event.target.value))}
+                  />
+                </label>
 
                 <button
                   type="button"
