@@ -13,6 +13,7 @@ import { valuationOptions, valueCar, describeError } from "../lib/api";
 import { scan as scanWithModel, modelInfo } from "../lib/damageModel";
 import { itemsFromScan, OPPOSITE_END } from "../lib/panels";
 import { likelyCars } from "../lib/carGuess";
+import CarPicker from "../components/CarPicker";
 import { money } from "../lib/money";
 
 // Shared, so a crore reads as a crore on every page. See lib/money.js.
@@ -417,34 +418,12 @@ export default function DamagePage() {
                     Indian cars by model — so this is the closest match by{" "}
                     {filled.body ? "body style and size" : "size"}
                     {filled.colour ? `, in ${filled.colour.toLowerCase()}` : ""}.
-                    Change it below if it is wrong; the repairs stay as they are.
+                    If it is wrong, search for yours below; the repairs stay as
+                    they are either way.
                   </li>
                 )}
               </ul>
 
-              {filled.candidates.length > 1 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {filled.candidates.map((entry) => {
-                    const key = `${entry.brand}|${entry.model}`;
-                    const active = key === selected;
-
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setSelected(key)}
-                        className={`readout border px-2 py-1 text-[10px] transition-colors ${
-                          active
-                            ? "border-data bg-data/15 text-chalk"
-                            : "border-line text-fog hover:border-data/60 hover:text-chalk"
-                        }`}
-                      >
-                        {entry.model}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           )}
 
@@ -541,20 +520,12 @@ export default function DamagePage() {
               <p className="label">Is it worth fixing before selling</p>
 
               <div className="mt-4 space-y-3">
-                <select
-                  className="field"
+                <CarPicker
+                  models={options.models}
                   value={selected}
-                  onChange={(event) => setSelected(event.target.value)}
-                >
-                  {options.models.map((entry) => (
-                    <option
-                      key={`${entry.brand}|${entry.model}`}
-                      value={`${entry.brand}|${entry.model}`}
-                    >
-                      {entry.model}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelected}
+                  label="Car"
+                />
 
                 <div className="grid grid-cols-2 gap-2">
                   <label className="block">
