@@ -1,42 +1,53 @@
-"""Trains the classifier that names the cars this project actually models.
+"""Trains a recogniser for this project's own fifteen cars. It does not work.
 
     node ../frontend/tools/render-garage.mjs --per=300
-    python train_garage.py
+    python train_garage.py && python finish_garage.py
 
-Reads data/garage/<car>/*.jpg, one folder per car, rendered from the garage's
-own GLB files.
+THE RESULT, BEFORE ANYTHING ELSE
+--------------------------------
+    on renders of our cars      100% recognised
+    on photographs of our cars    0% recognised
 
-Why this exists when the make classifier did not work
------------------------------------------------------
-Naming a car from a photograph needs labelled photographs of that car, and for
-Indian cars none are published. Stanford Cars was the only option and it failed
-honestly: 36.5% overall, Toyota at 0.15 precision, and no Maruti, Tata,
-Mahindra or Kia in it at all.
+Both numbers are from the same model. That is the whole story.
 
-But this project owns fifteen cars outright, as 3D models, and a model you own
-can be photographed from anywhere, in any light, as many times as you like,
-perfectly labelled. That is the whole idea here -- and the Fortuner that
-started the complaint is one of the fifteen.
+Shown real photographs of cars it was trained to know -- an Audi R8, a Jeep
+Wrangler, a Corvette, an Aventador, all of which we model -- it answered
+"other" for essentially every one:
 
-The catch, and it is the whole risk
------------------------------------
-These are renders. A real photograph has a real camera's noise and blur, real
-sunlight, a real street behind it and dirt on the paint. A classifier can learn
-to separate fifteen clean renders almost perfectly and still fall apart on a
-photograph, and a held-out split made of renders would happily report 99% while
-that was true. So:
+    audi-r8                0% correct, 100% called "other"
+    jeep-wrangler-rubicon  0% correct, 100% called "other"
+    chevrolet-corvette-c8  0% correct, 100% called "other"
+    lamborghini-aventador  8% correct,  84% called "other"
 
-  * the renderer varies angle, elevation, distance, focal length, lighting and
-    background, and crops to the car the way the detector will at inference;
-  * the augmentation below adds the things a render does not have -- noise,
-    blur, colour casts, brightness swings, JPEG mush, and greyscale, so the
-    model cannot lean on paint colour, since a Fortuner comes in several and
-    the renders only show one;
-  * and the number this prints is measured on held-out *renders*, which is an
-    upper bound on real-photograph accuracy and is labelled as such wherever it
-    is shown.
+WHY, AND WHY THE GOOD NUMBERS WERE MEANINGLESS
+----------------------------------------------
+Every one of the fifteen car classes was renders. The whole "other" class was
+photographs. So "is this a render or a photograph" separates the training data
+perfectly, and it is a far easier question than "which car is this". Gradient
+descent found that shortcut immediately and never needed to learn a car.
 
-The only way to know the real figure is to try it on real photographs.
+It then reported 100% on held-out renders and 100% rejection on held-out
+photographs -- and both were the same artifact wearing two hats. A test set
+drawn from the same two piles cannot catch this, because the shortcut works
+perfectly there too. It only shows up when you ask for a photograph of a car
+that IS one of the fifteen, which is a test that has to be constructed
+deliberately.
+
+Worse, five of our cars have real photographs inside Stanford Cars, and those
+went into "other" -- explicitly teaching it that a photograph of an Audi R8 is
+not an Audi R8.
+
+WHAT WOULD ACTUALLY BE NEEDED
+-----------------------------
+Renders and photographs have to stop being separable. That means real
+backgrounds behind the cars rather than flat colour, image-based lighting from
+real environments, and negatives that include renders as well as photographs so
+the shortcut carries no information. Or, far more simply, real photographs of
+these fifteen cars -- which is the data that does not exist and is the reason
+any of this was attempted.
+
+The scripts are kept because the measurement is the useful part. The weights
+were built, deployed, and taken back off the site when this was found.
 """
 
 import json

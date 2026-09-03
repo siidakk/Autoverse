@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { inspectPhoto, warmDetector, detectorState, MODEL_SIZE_MB } from "../lib/vision";
-import { garageCarById, matchGarageBody } from "../data/garageMatch";
+import { matchGarageBody } from "../data/garageMatch";
 
 // Photo of a car, in. The closest thing we can actually show you, out, painted
 // the colour yours is. This is the way into the configurator for somebody who
@@ -95,19 +95,9 @@ export default function DetectPage() {
     }
   };
 
-  // Two different answers, and the difference matters enough to show.
-  //
-  // If the recogniser named one of the fifteen cars this project models, that
-  // is a claim about *this* car. Otherwise the best available is the closest
-  // shape we happen to have, which is a claim about the category. The card
-  // says which of the two it is rather than presenting both as the same thing.
-  const recognised = result?.garageCar ? garageCarById(result.garageCar) : null;
-
-  const match = recognised
-    ? { car: recognised, exact: true, recognised: true }
-    : result?.body
-      ? matchGarageBody(result.body)
-      : null;
+  // Only when the shape is actually known. Opening "the closest car to a
+  // null" would be the old behaviour wearing a new coat.
+  const match = result?.body ? matchGarageBody(result.body) : null;
 
   return (
     <div className="mx-auto max-w-[1500px] px-5 py-14 md:px-8">
@@ -330,29 +320,15 @@ export default function DetectPage() {
 
               {match && (
                 <div className="panel p-6">
-                  <p className="label">
-                    {match.recognised ? "Recognised" : "Closest car we model"}
-                  </p>
+                  <p className="label">Closest car we model</p>
                   <p className="mt-2 text-lg font-medium tracking-tight">
                     {match.car.name}
                   </p>
-
-                  {match.recognised ? (
-                    <p className="mt-1 text-xs leading-relaxed text-fog">
-                      {Math.round(result.garageConfidence * 100)}% sure — this is
-                      one of the fifteen cars the site models, so it was learned
-                      from that car specifically rather than from its shape.
-                      {" "}Accuracy was measured on rendered views of these
-                      models, not on photographs, so treat it as the optimistic
-                      figure.
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-xs text-fog">
-                      {match.exact
-                        ? `Also a ${result.body.toLowerCase()}`
-                        : `Nearest shape to a ${result.body.toLowerCase()}`}
-                    </p>
-                  )}
+                  <p className="mt-1 text-xs text-fog">
+                    {match.exact
+                      ? `Also a ${result.body.toLowerCase()}`
+                      : `Nearest shape to a ${result.body.toLowerCase()}`}
+                  </p>
 
                   <Link
                     to={`/customise?car=${match.car.id}&colour=${encodeURIComponent(result.paint.hex)}`}

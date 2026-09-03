@@ -4,17 +4,14 @@
 // nothing to host and means a photo of somebody's car never leaves it.
 //
 // What this can and cannot do is worth being plain about. It finds a vehicle,
-// reads its paint, and asks two trained classifiers about it: what shape it is,
-// and whether it is one of the fifteen cars this project models.
+// reads its paint, and asks a trained classifier what shape it is.
 //
-// It cannot name a car outside those fifteen. There is no public dataset of
-// Indian cars by model, and the attempt to get there through manufacturer
-// recognition was measured and abandoned -- see ml/train_make.py for the
-// numbers. The fifteen are nameable only because the project owns their
-// geometry and could render them from every angle.
+// It does not name cars. Two attempts are recorded in ml/ rather than hidden:
+// a manufacturer classifier that scored 36.5%, and a recogniser trained on
+// renders of this project's own fifteen cars, which scored 100% on renders and
+// 0% on photographs of the same cars. Neither shipped. See train_garage.py.
 
 import { readBody } from "./bodyModel";
-import { readGarageCar } from "./garageModel";
 import { atNaturalSize } from "./imageSource";
 
 let detector = null;
@@ -275,16 +272,6 @@ export async function inspectPhoto(image, onProgress) {
     bodySource = "detector";
   }
 
-  // And which car it is, where "which" means one of the fifteen this project
-  // models -- the only cars it can name, because they are the only ones it
-  // owns the geometry for and could therefore photograph from every angle.
-  //
-  // Null until the model is built, and null whenever it is not sure, which for
-  // anything outside those fifteen it always should be: every other car in the
-  // world is, to that classifier, one of them. See garageModel.js.
-  onProgress?.("Recognising the car");
-  const named = await readGarageCar(source, best.bbox, onProgress);
-
   return {
     found: true,
     label: best.class,
@@ -294,9 +281,6 @@ export async function inspectPhoto(image, onProgress) {
     bodySource,
     bodyConfidence,
     bodyRecall,
-    garageCar: named?.car ?? null,
-    garageConfidence: named?.confidence ?? null,
-    garageRecall: named?.recall ?? null,
     ratio,
     paint,
     colourName: nameColour(paint.hex),
