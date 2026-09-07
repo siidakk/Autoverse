@@ -328,8 +328,42 @@ const SEGMENT_FACTOR = {
   Luxury: 3.3
 };
 
-export function repairCost(items, segment = "Mid") {
-  const multiplier = SEGMENT_FACTOR[segment] ?? 1.35;
+// The middle of each of the catalogue's price bands, in rupees. Budget is
+// under 9 lakh, Mid 9 to 18, Premium 18 to 40, Luxury above -- and Luxury runs
+// from a 40 lakh Volvo to an 11 crore Bugatti, which is why it needs a pivot
+// far above its floor.
+const SEGMENT_PIVOT = {
+  Budget: 600000,
+  Mid: 1300000,
+  Premium: 2700000,
+  Luxury: 9000000
+};
+
+/**
+ * What a workshop would charge, given the damage and the car it is on.
+ *
+ * The segment sets the band and the price moves within it. Segment alone was
+ * four numbers for a hundred and eighty six cars: a Swift and a Baleno came to
+ * the same rupee, and so did a 40 lakh Volvo and an 11 crore Bugatti. Changing
+ * the car mostly changed nothing, which made the estimate look like it was not
+ * reading the car at all.
+ *
+ * Sublinear on purpose. A bumper for a car costing ten times more does not
+ * cost ten times more -- it is the same shape of part in more expensive
+ * plastic, painted to a higher standard -- so the exponent is well under one
+ * and the trim is clamped at both ends. Segment stays the base so this page
+ * and Discover still agree about what kind of car it is.
+ */
+export function repairCost(items, segment = "Mid", price = null) {
+  const base = SEGMENT_FACTOR[segment] ?? 1.35;
+
+  const pivot = SEGMENT_PIVOT[segment];
+  const trim =
+    price && pivot
+      ? Math.min(Math.max((price / pivot) ** 0.45, 0.75), 1.6)
+      : 1;
+
+  const multiplier = base * trim;
 
   return items.reduce((total, item) => {
     const base = DAMAGE_TYPES[item.type]?.costs[item.severity] ?? 0;

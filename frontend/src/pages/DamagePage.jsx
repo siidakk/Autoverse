@@ -42,7 +42,11 @@ export default function DamagePage() {
   const [selected, setSelected] = useState("");
   const [year, setYear] = useState(2016);
   const [km, setKm] = useState(60000);
-  const [valuation, setValuation] = useState(null);
+  // What the model said a clean example is worth, and the car and condition it
+  // was asked about. Kept apart from the resale arithmetic so the two halves
+  // can go stale independently: the damage half is ours and recomputes for
+  // free, the clean half is an API call and only that needs asking again.
+  const [clean, setClean] = useState(null);
   const [valuing, setValuing] = useState(false);
   const [valueError, setValueError] = useState(null);
 
@@ -78,7 +82,7 @@ export default function DamagePage() {
   // by 57% between two pages describing one car.
   const segment = car?.segment ?? "Mid";
 
-  const cost = repairCost(items, segment);
+  const cost = repairCost(items, segment, car?.typical ?? null);
 
   // Fills in what a photograph can actually answer, and records what it filled
   // so the page can be plain about which half to trust.
@@ -217,7 +221,7 @@ export default function DamagePage() {
     setValueError(null);
 
     try {
-      const clean = await valueCar({
+      const answer = await valueCar({
         brand: car.brand,
         age: (options.years[1] ?? 2020) - year,
         km,
@@ -231,13 +235,22 @@ export default function DamagePage() {
         seller: "Individual"
       });
 
-      setValuation(resaleImpact(clean.estimate, cost, items));
+      setClean({ estimate: answer.estimate, forCar: selected, forYear: year, forKm: km });
     } catch (error) {
       setValueError(describeError(error));
     } finally {
       setValuing(false);
     }
   };
+
+  // Stale the moment the question changes. Editing the damage re-derives for
+  // free; changing the car, year or mileage means asking the model again, so
+  // the numbers are withdrawn and the button offered rather than leaving a
+  // different car's valuation on screen.
+  const answered =
+    clean && clean.forCar === selected && clean.forYear === year && clean.forKm === km;
+
+  const valuation = answered ? resaleImpact(clean.estimate, cost, items) : null;
 
   const update = (index, key, next) =>
     setItems((current) =>
@@ -250,7 +263,7 @@ export default function DamagePage() {
     // visible together, and the resale panel used to start 773 pixels down --
     // below the fold on any laptop -- because a full-height header sat above
     // it explaining what the page does.
-    <div className="mx-auto max-w-[1500px] px-5 py-7 md:px-8">
+    <div className="mx-auto max-w-[1500px] px-5 pt-7 pb-3 md:px-8">
 
       <header className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <p className="label">05 / Damage</p>
@@ -409,27 +422,7 @@ export default function DamagePage() {
                   </li>
                 )}
 
-                {filled.candidates.length > 0 && (
-                  <li>
-                    <span className="text-chalk">The car is a guess</span> from shape
-                    {filled.colour ? ` and colour (${filled.colour.toLowerCase()})` : " and size"},
-                    never a badge. Change it if it is wrong — the repairs stay.
-                  </li>
-                )}
               </ul>
-
-              {/* Correcting it belongs next to the guess, not three panels
-                  further down where it had to be scrolled to. */}
-              {options && (
-                <div className="mt-3">
-                  <CarPicker
-                    models={options.models}
-                    value={selected}
-                    onChange={setSelected}
-                    label="Car"
-                  />
-                </div>
-              )}
             </div>
           )}
 
@@ -455,7 +448,27 @@ export default function DamagePage() {
               </button>
             </div>
 
-            <div className="mt-4 space-y-4">
+            {/* The car sits at the top of the bill because it is what the bill
+                is priced against -- workshop rates, and the parts they fit.
+                It used to sit two panels below, so the number moved and the
+                reason why was off the bottom of the screen. */}
+            {options && (
+              <div className="mt-3 border-b border-line-soft pb-3">
+                <CarPicker
+                  models={options.models}
+                  value={selected}
+                  onChange={setSelected}
+                  label="Car"
+                />
+                <p className="mt-2 text-[11px] leading-snug text-fog">
+                  {filled?.candidates.length
+                    ? "A guess from the photo — shape and size, never a badge. Choose the right one if it is wrong; the repairs stay."
+                    : "Sets the workshop rates below."}
+                </p>
+              </div>
+            )}
+
+            <div className="mt-3 max-h-[190px] space-y-3 overflow-y-auto pr-1">
               {items.map((item, index) => (
                 <div key={index} className="border border-line-soft p-3">
                   <div className="flex items-center justify-between">
@@ -507,20 +520,20 @@ export default function DamagePage() {
                     </select>
                   </div>
 
-                  <p className="mt-2 text-[11px] text-fog">
+                  <p className="mt-1.5 text-[11px] leading-snug text-fog">
                     {DAMAGE_TYPES[item.type].note} · {SEVERITIES[item.severity].note}
                   </p>
                 </div>
               ))}
             </div>
 
-            <div className="tick-rule-dense mt-5 opacity-60" />
+            <div className="tick-rule-dense mt-3 opacity-60" />
 
-            <div className="mt-4 flex items-end justify-between">
+            <div className="mt-3 flex items-end justify-between">
               <span className="label">Repair estimate</span>
               <span className="readout text-2xl text-signal">{rupees(cost)}</span>
             </div>
-            <p className="mt-2 text-[11px] text-fog">
+            <p className="mt-1 text-[11px] text-fog">
               Workshop rates for a {segment.toLowerCase()} car
             </p>
           </div>
@@ -530,17 +543,7 @@ export default function DamagePage() {
             <div className="panel p-4">
               <p className="label">Is it worth fixing before selling</p>
 
-              <div className="mt-3 space-y-2">
-                {/* Only when the photo has not already put one at the top. */}
-                {!filled && (
-                  <CarPicker
-                    models={options.models}
-                    value={selected}
-                    onChange={setSelected}
-                    label="Car"
-                  />
-                )}
-
+              <div className="mt-2 space-y-2">
                 {/* Label beside the slider rather than above it: two rows
                     saved, and the number is next to the thing that sets it. */}
                 <label className="flex items-center gap-3">
