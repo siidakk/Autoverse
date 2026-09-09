@@ -59,11 +59,22 @@ export default function AuthorCard() {
               {/* WHO */}
               <div>
                 <div className="flex items-center gap-4">
-                  {/* The same monogram the nav uses when you are signed in,
-                      at the size this section deserves. */}
-                  <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-line bg-raised text-lg font-semibold tracking-tight text-chalk md:h-16 md:w-16 md:text-xl">
-                    {initials(AUTHOR.name)}
-                  </span>
+                  {/* A face if there is one, initials if there is not -- the
+                      same monogram the nav uses when you are signed in. */}
+                  {AUTHOR.photo ? (
+                    <img
+                      src={AUTHOR.photo}
+                      alt={AUTHOR.name}
+                      loading="lazy"
+                      width={72}
+                      height={72}
+                      className="h-16 w-16 shrink-0 rounded-full border border-line object-cover md:h-[72px] md:w-[72px]"
+                    />
+                  ) : (
+                    <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-line bg-raised text-lg font-semibold tracking-tight text-chalk md:h-16 md:w-16 md:text-xl">
+                      {initials(AUTHOR.name)}
+                    </span>
+                  )}
 
                   <div className="min-w-0">
                     <h2 className="text-3xl leading-tight font-semibold tracking-tight md:text-4xl">
@@ -128,6 +139,43 @@ export default function AuthorCard() {
                 </ul>
               </div>
             </div>
+
+            {/* Not this project. Two lines each: a signpost to the portfolio,
+                not a second copy of the CV. */}
+            {AUTHOR.elsewhere?.length > 0 && (
+              <>
+                <div className="tick-rule-dense mt-8 opacity-60" />
+
+                <div className="mt-6">
+                  <p className="label">Elsewhere</p>
+
+                  <div className="mt-4 grid gap-6 md:grid-cols-2 md:gap-10">
+                    {AUTHOR.elsewhere.map((place, index) => (
+                      <motion.div
+                        key={place.org}
+                        initial={{ opacity: 0, y: 12 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.45, delay: 0.1 + index * 0.08 }}
+                      >
+                        <div className="flex items-baseline justify-between gap-3">
+                          <p className="font-medium tracking-tight text-chalk">
+                            {place.org}
+                          </p>
+                          <span className="label shrink-0">{place.when}</span>
+                        </div>
+
+                        <p className="mt-0.5 text-xs text-signal">{place.role}</p>
+
+                        <p className="mt-2 text-sm leading-relaxed text-fog">
+                          {place.note}
+                        </p>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </motion.div>
       </div>

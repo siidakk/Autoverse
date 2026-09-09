@@ -156,7 +156,7 @@ export default function RecommendPage() {
       >
         <p>
           Content based filtering over every car on sale in India today, 186 of
-          them, from about three lakh to eleven crore. Anything that cannot work
+          them, from under five lakh to eleven crore. Anything that cannot work
           — too dear, too few seats, wrong fuel — is filtered out first, and what
           remains is ranked against what you asked for rather than by price
           alone.
