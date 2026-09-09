@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { SECTIONS } from "../../data/navigation";
+import { AUTHOR, hasAuthor } from "../../data/author";
 
 const stack = [
   "React 19",
@@ -76,7 +77,14 @@ export default function SiteFooter() {
       <div className="relative border-t border-white/8 px-5 py-6 md:px-8">
         <div className="mx-auto flex max-w-[1500px] flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="readout text-[10px] tracking-widest text-fog">
-            AUTOVERSE / BUILT AS A PORTFOLIO PROJECT
+            AUTOVERSE /{" "}
+            {hasAuthor() ? (
+              <Link to="/#built-by" className="transition-colors hover:text-signal">
+                BUILT BY {AUTHOR.name.toUpperCase()}
+              </Link>
+            ) : (
+              "BUILT AS A PORTFOLIO PROJECT"
+            )}
           </p>
           <p className="readout text-[10px] tracking-widest text-fog">
             Damage model trained on CarDD · non-commercial research use

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion, useInView } from "framer-motion";
 import { useProgress, useGLTF } from "@react-three/drei";
 import HeroScene from "../components/home/HeroScene";
+import AuthorCard from "../components/home/AuthorCard";
 import { HERO_SEQUENCE, DISPLAY_MS, FADE_MS } from "../components/home/heroSequence";
 import { SECTIONS } from "../data/navigation";
 
@@ -465,6 +466,9 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* ================= BUILT BY ================= */}
+      <AuthorCard />
 
       {/* ================= CTA ================= */}
       <section className="relative overflow-hidden border-t border-white/8">
