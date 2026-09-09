@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import MLPanel from "../components/MLPanel";
+import PageHeader from "../components/layout/PageHeader";
 import { matchGarageCar } from "../data/garageMatch";
 import { describeAccessory } from "../data/accessories";
 import { money } from "../lib/money";
@@ -146,27 +147,33 @@ export default function RecommendPage() {
   const results = data?.results ?? null;
 
   return (
-    <div className="mx-auto max-w-[1500px] px-5 py-14 md:px-8">
+    <div className="mx-auto max-w-[1500px] px-5 pt-7 pb-10 md:px-8">
 
-      <header>
-        <p className="label">02 / Discover</p>
-        <h1 className="mt-4 max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">
-          Tell it how you drive.
-        </h1>
-        <p className="mt-5 max-w-xl text-sm leading-relaxed text-fog">
-          Content based filtering over every car on sale in India today.
-          Anything that cannot work is filtered out first, then what remains is
-          ranked against what you asked for. Every result says why it is there.
+      <PageHeader
+        section="Discover"
+        title="Which car should I buy?"
+        summary="Say what you can spend and how you drive. You get cars that fit, each one saying why."
+      >
+        <p>
+          Content based filtering over every car on sale in India today, 186 of
+          them, from about three lakh to eleven crore. Anything that cannot work
+          — too dear, too few seats, wrong fuel — is filtered out first, and what
+          remains is ranked against what you asked for rather than by price
+          alone.
         </p>
-        <div className="tick-rule mt-8 opacity-70" />
-      </header>
+        <p>
+          Every result carries its own reasons, so a match you disagree with can
+          be argued with rather than just accepted.
+        </p>
+      </PageHeader>
 
-      <div className="mt-12 grid gap-10 lg:grid-cols-[380px_1fr]">
+      <div className="mt-5 grid gap-6 lg:grid-cols-[380px_1fr]">
 
         <div>
-          <div className="panel p-6 lg:sticky lg:top-24">
-            <p className="label">About you</p>
-            <div className="mt-5">
+          <div className="panel p-5 lg:sticky lg:top-24">
+            {/* Named for what filling it in does, not for what it contains. */}
+            <p className="label">Step 1 — What you need</p>
+            <div className="mt-4">
               <MLPanel onResults={setData} />
             </div>
           </div>
@@ -176,10 +183,11 @@ export default function RecommendPage() {
           {results === null && (
             <div className="grid-veil flex min-h-[320px] items-center justify-center border border-line-soft p-10 text-center">
               <div>
-                <p className="label">Awaiting input</p>
+                <p className="label">Step 2 — Your matches</p>
                 <p className="mt-4 max-w-sm text-sm leading-relaxed text-fog">
-                  Set a budget and say how you drive. Matches appear here with
-                  the reasoning behind each one.
+                  Fill in the panel on the left and press Find my car. Cars
+                  that fit appear here, best first, each one saying why it made
+                  the list.
                 </p>
               </div>
             </div>

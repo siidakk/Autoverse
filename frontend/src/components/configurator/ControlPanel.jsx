@@ -23,7 +23,7 @@ import {
 } from "../../data/accessories";
 
 const TABS = [
-  { id: "assistant", label: "Assist" },
+  { id: "assistant", label: "Describe" },
   { id: "paint", label: "Paint" },
   { id: "wheels", label: "Wheels" },
   { id: "body", label: "Body" },

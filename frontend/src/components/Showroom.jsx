@@ -33,6 +33,13 @@ import { useLiveRoom, newRoomCode } from "../lib/live";
 function CarList({ selected, onSelect }) {
   return (
     <aside className="flex shrink-0 gap-px overflow-x-auto border-b border-line-soft bg-line-soft lg:w-60 lg:flex-col lg:overflow-x-hidden lg:overflow-y-auto lg:border-b-0 lg:border-r">
+      {/* Sticky, because on a list of fifteen the heading scrolls away before
+          the cars do. Hidden on a phone, where the rail is a horizontal strip
+          of car names and reads as one already. */}
+      <p className="label sticky top-0 z-10 hidden bg-ink px-5 pt-4 pb-2 text-chalk lg:block">
+        Pick a car
+      </p>
+
       {bodyStyles.map((style) => (
         <div key={style} className="contents lg:block lg:bg-ink">
           <p className="label hidden px-5 pt-5 pb-2 lg:block">{style}</p>
@@ -674,7 +681,7 @@ export default function Showroom() {
           ].join(" ")}
         >
           <div className="hud-frame h-full w-full">
-            <div className="absolute top-0 left-0 pl-6">
+            <div className="absolute top-0 left-0 hidden pl-6 md:block">
               <p className="readout text-lg tracking-tight">{selectedCar.name}</p>
               <p className="label mt-1">
                 {finish} · {wheelType} wheels
@@ -688,7 +695,7 @@ export default function Showroom() {
               </p>
             </div>
 
-            <div className="absolute bottom-0 left-0">
+            <div className="absolute bottom-0 left-0 hidden md:block">
               <p className="label">Drag to orbit · scroll to zoom · right-drag to pan</p>
             </div>
           </div>

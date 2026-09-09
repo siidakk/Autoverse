@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { valuationOptions, valueCar, describeError } from "../lib/api";
 import DepreciationChart from "../components/valuation/DepreciationChart";
+import PageHeader from "../components/layout/PageHeader";
+import HowItWorks from "../components/layout/HowItWorks";
 import { money } from "../lib/money";
 
 // Shared, so a crore reads as a crore on every page. See lib/money.js.
@@ -85,46 +87,46 @@ export default function ValuationPage() {
   const accuracy = options?.accuracy;
 
   return (
-    <div className="mx-auto max-w-[1500px] px-5 py-14 md:px-8">
+    <div className="mx-auto max-w-[1500px] px-5 pt-7 pb-10 md:px-8">
 
-      <header>
-        <p className="label">03 / Valuation</p>
-        <h1 className="mt-4 max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">
-          What is it worth now?
-        </h1>
-        <p className="mt-5 max-w-xl text-sm leading-relaxed text-fog">
+      <PageHeader
+        section="Value"
+        title="What is my car worth?"
+        summary="Pick the car, say how old it is and how far it has gone. You get a price range a buyer would recognise."
+      >
+        <p>
           Gradient boosted trees over 7,906 Indian listings, valuing a car from
-          its age, distance, owners and specification. Answers come as a range,
-          because a figure quoted to the rupee would be pretending.
+          its age, distance, owners and specification. Answers come as a range
+          rather than a figure, because a number quoted to the rupee would be
+          pretending to a confidence the model does not have.
         </p>
         {/* The listings are from 2020 and no newer Indian set exists publicly,
             so the model answers in 2020 money. Age is what it actually reads,
             and it learned ages nought to twenty-five, so a 2024 car is a fair
             question -- the answer is simply denominated six years ago. Saying
             that is the difference between a limitation and a wrong number. */}
-        <p className="mt-4 max-w-xl text-xs leading-relaxed text-fog/80">
+        <p>
           One thing to hold in mind: the listings behind it were collected in
           2020, so the figures are in 2020 rupees. What it knows well is how a
           car loses value with age, distance and owners — not what six years of
           the market have done to the price on top of that.
         </p>
-        <div className="tick-rule mt-8 opacity-70" />
-      </header>
+      </PageHeader>
 
       {loadError && (
-        <div className="mt-10 border border-signal-deep bg-signal-deep/10 px-5 py-4">
+        <div className="mt-5 border border-signal-deep bg-signal-deep/10 px-5 py-4">
           <p className="label text-signal">Could not load</p>
           <p className="mt-2 text-xs text-fog">{loadError}</p>
         </div>
       )}
 
       {options && (
-        <div className="mt-12 grid gap-10 lg:grid-cols-[380px_1fr]">
+        <div className="mt-5 grid gap-6 lg:grid-cols-[380px_1fr]">
 
           {/* THE CAR */}
           <div>
-            <div className="panel space-y-5 p-6 lg:sticky lg:top-24">
-              <p className="label">The car</p>
+            <div className="panel space-y-4 p-5 lg:sticky lg:top-24">
+              <p className="label">Step 1 — Your car</p>
 
               <label className="block">
                 <span className="label">Model</span>
@@ -216,59 +218,69 @@ export default function ValuationPage() {
                 </div>
               </div>
 
-              <label className="block">
-                <span className="label">Owners</span>
-                <select
-                  className="field mt-2"
-                  value={owner}
-                  onChange={(event) => setOwner(event.target.value)}
-                >
-                  {options.owners.map((entry) => (
-                    <option key={entry} value={entry}>{entry}</option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="grid grid-cols-2 gap-3">
+              {/* Model, age and distance are what anybody knows about their
+                  own car, and they are what the model leans on hardest. The
+                  other four already carry sensible defaults, and keeping them
+                  open pushed "Value this car" to 847 pixels -- just below the
+                  fold, so the page looked like a form with no way to submit. */}
+              <HowItWorks
+                label="Refine this — owners, fuel, gearbox, seller"
+                bodyClassName="space-y-4 pt-4"
+              >
                 <label className="block">
-                  <span className="label">Fuel</span>
+                  <span className="label">Owners</span>
                   <select
                     className="field mt-2"
-                    value={fuel}
-                    onChange={(event) => setFuel(event.target.value)}
+                    value={owner}
+                    onChange={(event) => setOwner(event.target.value)}
                   >
-                    {(car?.fuels ?? ["Petrol"]).map((entry) => (
+                    {options.owners.map((entry) => (
                       <option key={entry} value={entry}>{entry}</option>
                     ))}
                   </select>
                 </label>
 
+                <div className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 min-[420px]:gap-3">
+                  <label className="block">
+                    <span className="label">Fuel</span>
+                    <select
+                      className="field mt-2"
+                      value={fuel}
+                      onChange={(event) => setFuel(event.target.value)}
+                    >
+                      {(car?.fuels ?? ["Petrol"]).map((entry) => (
+                        <option key={entry} value={entry}>{entry}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="label">Gearbox</span>
+                    <select
+                      className="field mt-2"
+                      value={transmission}
+                      onChange={(event) => setTransmission(event.target.value)}
+                    >
+                      {(car?.transmissions ?? ["Manual"]).map((entry) => (
+                        <option key={entry} value={entry}>{entry}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
                 <label className="block">
-                  <span className="label">Gearbox</span>
+                  <span className="label">Selling as</span>
                   <select
                     className="field mt-2"
-                    value={transmission}
-                    onChange={(event) => setTransmission(event.target.value)}
+                    value={seller}
+                    onChange={(event) => setSeller(event.target.value)}
                   >
-                    {(car?.transmissions ?? ["Manual"]).map((entry) => (
+                    {options.sellers.map((entry) => (
                       <option key={entry} value={entry}>{entry}</option>
                     ))}
                   </select>
                 </label>
-              </div>
-
-              <label className="block">
-                <span className="label">Selling as</span>
-                <select
-                  className="field mt-2"
-                  value={seller}
-                  onChange={(event) => setSeller(event.target.value)}
-                >
-                  {options.sellers.map((entry) => (
-                    <option key={entry} value={entry}>{entry}</option>
-                  ))}
-                </select>
-              </label>
+              </HowItWorks>
 
               <button
                 type="button"
@@ -292,10 +304,11 @@ export default function ValuationPage() {
             {!result && (
               <div className="grid-veil flex min-h-[320px] items-center justify-center border border-line-soft p-10 text-center">
                 <div>
-                  <p className="label">Awaiting a car</p>
+                  <p className="label">Step 2 — What it is worth</p>
                   <p className="mt-4 max-w-sm text-sm leading-relaxed text-fog">
-                    Pick a model, its year and how far it has gone. The estimate
-                    appears here with the range around it.
+                    Fill in the panel on the left and press the button. The
+                    estimate appears here, with the range around it and how
+                    confident the model is.
                   </p>
                 </div>
               </div>

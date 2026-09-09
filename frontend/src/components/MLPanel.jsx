@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { recommend, catalogueMeta, apiBaseUrl } from "../lib/api";
 import { budgetsFor, money } from "../lib/money";
+import HowItWorks from "./layout/HowItWorks";
 
 // What a buyer can actually say about themselves. The old form asked for
 // horsepower and highway mpg, which is the answer, not the question.
@@ -69,10 +70,21 @@ function Field({ label, children }) {
 }
 
 function Segmented({ options, value, onChange, columns = 3 }) {
+  // A column count that reads well on a laptop can be too narrow for the words
+  // in it on a phone: "What matters most" is four columns, and at 375px that
+  // gave "Performance" 46 pixels for 63 pixels of text, so it was clipped
+  // mid-word. Long labels get fewer columns on a narrow screen; short ones
+  // ("40L", "1cr", "5") are left alone.
+  const longest = options.reduce(
+    (most, option) => Math.max(most, String(option.label ?? option).length),
+    0
+  );
+  const narrow = longest > 7 ? Math.max(2, Math.ceil(columns / 2)) : columns;
+
   return (
     <div
-      className="grid gap-px bg-line-soft"
-      style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+      className="grid gap-px bg-line-soft [grid-template-columns:repeat(var(--cols),minmax(0,1fr))] max-[419px]:[grid-template-columns:repeat(var(--cols-narrow),minmax(0,1fr))]"
+      style={{ "--cols": columns, "--cols-narrow": narrow }}
     >
       {options.map((option) => {
         const key = option.value ?? option;
@@ -193,14 +205,18 @@ export default function MLPanel({ onResults }) {
           <Segmented options={fuels} value={fuel} onChange={setFuel} columns={tidyColumns(fuels.length)} />
         </Field>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-5 min-[420px]:grid-cols-2 min-[420px]:gap-3">
           <Field label="Seats needed">
             <Segmented options={seatCounts} value={seats} onChange={setSeats} columns={tidyColumns(seatCounts.length, [3, 4])} />
           </Field>
 
           <Field label="Gearbox">
             <Segmented
-              options={["any", "Manual", "Automatic"]}
+              options={[
+                { value: "any", label: "Any" },
+                { value: "Manual", label: "Manual" },
+                { value: "Automatic", label: "Auto" }
+              ]}
               value={transmission}
               onChange={setTransmission}
               columns={3}
@@ -208,28 +224,38 @@ export default function MLPanel({ onResults }) {
           </Field>
         </div>
 
-        <Field label="Body">
-          <Segmented options={bodies} value={body} onChange={setBody} columns={tidyColumns(bodies.length)} />
-        </Field>
+        {/* Everything past this point has a sensible default already selected,
+            and leaving it alone still returns a good answer. Kept open would
+            put the button that actually does something 1,282 pixels down the
+            page -- below the fold on every screen -- so somebody who only
+            wanted to say "twelve lakh, petrol, five seats" never saw it. */}
+        <HowItWorks
+          label="Refine this — body, driving, what matters"
+          bodyClassName="space-y-5 pt-4"
+        >
+          <Field label="Body">
+            <Segmented options={bodies} value={body} onChange={setBody} columns={tidyColumns(bodies.length)} />
+          </Field>
 
-        <Field label="How you drive">
-          <Segmented options={DRIVING} value={driving} onChange={setDriving} />
-        </Field>
+          <Field label="How you drive">
+            <Segmented options={DRIVING} value={driving} onChange={setDriving} />
+          </Field>
 
-        <Field label="Where you drive">
-          <Segmented options={USAGE} value={usage} onChange={setUsage} />
-        </Field>
+          <Field label="Where you drive">
+            <Segmented options={USAGE} value={usage} onChange={setUsage} />
+          </Field>
 
-        <Field label="What matters most">
-          <Segmented options={PRIORITY} value={priority} onChange={setPriority} columns={4} />
-        </Field>
+          <Field label="What matters most">
+            <Segmented options={PRIORITY} value={priority} onChange={setPriority} columns={4} />
+          </Field>
+        </HowItWorks>
       </div>
 
       <button
         type="button"
         onClick={run}
         disabled={loading}
-        className="btn btn-signal mt-7 w-full disabled:cursor-not-allowed disabled:opacity-60"
+        className="btn btn-signal mt-5 w-full disabled:cursor-not-allowed disabled:opacity-60"
       >
         {loading ? "Matching…" : "Find my car"}
       </button>

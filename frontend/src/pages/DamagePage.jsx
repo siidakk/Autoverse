@@ -14,6 +14,7 @@ import { scan as scanWithModel, modelInfo } from "../lib/damageModel";
 import { itemsFromScan, OPPOSITE_END } from "../lib/panels";
 import { likelyCars } from "../lib/carGuess";
 import CarPicker from "../components/CarPicker";
+import PageHeader from "../components/layout/PageHeader";
 import { money } from "../lib/money";
 
 // Shared, so a crore reads as a crore on every page. See lib/money.js.
@@ -263,21 +264,16 @@ export default function DamagePage() {
     // visible together, and the resale panel used to start 773 pixels down --
     // below the fold on any laptop -- because a full-height header sat above
     // it explaining what the page does.
-    <div className="mx-auto max-w-[1500px] px-5 pt-7 pb-3 md:px-8">
+    <div className="mx-auto max-w-[1500px] px-5 pt-5 pb-3 md:px-8">
 
-      <header className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <p className="label">05 / Damage</p>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          What will it cost, and is it worth fixing?
-        </h1>
-        <p className="text-xs text-fog">
-          Damage named by a classifier, costed against what the car is worth.
-        </p>
-      </header>
+      <PageHeader
+        dense
+        section="Repair"
+        title="What will this damage cost?"
+        summary="Add a photo of the damage, or describe it. You get a repair bill and whether fixing it pays."
+      />
 
-      <div className="tick-rule mt-3 opacity-70" />
-
-      <div className="mt-4 grid gap-5 lg:grid-cols-[1fr_400px]">
+      <div className="mt-3 grid gap-5 lg:grid-cols-[1fr_400px]">
 
         {/* THE PHOTO */}
         <div className="space-y-3">
@@ -460,7 +456,7 @@ export default function DamagePage() {
                   onChange={setSelected}
                   label="Car"
                 />
-                <p className="mt-2 text-[11px] leading-snug text-fog">
+                <p className="mt-1.5 text-[11px] leading-snug text-fog">
                   {filled?.candidates.length
                     ? "A guess from the photo — shape and size, never a badge. Choose the right one if it is wrong; the repairs stay."
                     : "Sets the workshop rates below."}
@@ -543,7 +539,7 @@ export default function DamagePage() {
             <div className="panel p-4">
               <p className="label">Is it worth fixing before selling</p>
 
-              <div className="mt-2 space-y-2">
+              <div className="mt-2 space-y-1.5">
                 {/* Label beside the slider rather than above it: two rows
                     saved, and the number is next to the thing that sets it. */}
                 <label className="flex items-center gap-3">

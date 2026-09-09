@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import PageHeader from "../components/layout/PageHeader";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { inspectPhoto, warmDetector, detectorState, MODEL_SIZE_MB } from "../lib/vision";
@@ -109,23 +110,29 @@ export default function DetectPage() {
   const chosen = choices.find((car) => car.id === picked) ?? choices[0] ?? null;
 
   return (
-    <div className="mx-auto max-w-[1500px] px-5 py-14 md:px-8">
+    <div className="mx-auto max-w-[1500px] px-5 pt-7 pb-10 md:px-8">
 
-      <header>
-        <p className="label">04 / Vision</p>
-        <h1 className="mt-4 max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">
-          Start from a photo of yours.
-        </h1>
-        <p className="mt-5 max-w-xl text-sm leading-relaxed text-fog">
-          Drop in a picture of a car. It is found in the frame, its paint is read
-          off the bodywork, and the closest car we can show you opens in that
-          colour. The model runs here in your browser, so the photo never leaves
-          your machine.
+      <PageHeader
+        section="Identify"
+        title="Start from a photo of a car"
+        summary="Drop in a picture. It reads the shape and the paint colour, then opens the closest car we have in 3D."
+      >
+        <p>
+          The car is found in the frame by an object detector, its body style
+          read by a classifier trained to answer that question, and its paint
+          sampled from the bodywork rather than the whole picture, so sky and
+          tarmac cannot vote.
         </p>
-        <div className="tick-rule mt-8 opacity-70" />
-      </header>
+        <p>
+          It reads shape and colour, not badges. Naming the exact model from a
+          photograph was tried three times and none of it was good enough to
+          ship — the attempts and their scores are written up in ml/. Both
+          models run here in your browser, so the photo never leaves your
+          machine.
+        </p>
+      </PageHeader>
 
-      <div className="mt-12 grid gap-10 lg:grid-cols-[1fr_380px]">
+      <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_380px]">
 
         {/* THE PHOTO */}
         <div>

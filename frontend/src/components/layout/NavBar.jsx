@@ -1,13 +1,23 @@
-import { useEffect, useState } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "../../lib/authContext";
 import { SECTIONS } from "../../data/navigation";
 
+// Where an account gets you. Kept beside the sign out that sits under them, so
+// the two menus cannot drift apart.
+const ACCOUNT_LINKS = [
+  { to: "/garage", label: "My garage", short: "Garage" },
+  { to: "/account", label: "Account details", short: "Account" }
+];
+
 export default function NavBar() {
   const [open, setOpen] = useState(false);
-  const { user } = useAuth();
+  const [account, setAccount] = useState(false);
+  const { user, signOut } = useAuth();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const accountRef = useRef(null);
 
   // The bar starts transparent over the hero and gains a background once the
   // page moves, so the landing image is not cut off by a strip of chrome.
@@ -27,9 +37,34 @@ export default function NavBar() {
   // just asked for. Closed on the next frame rather than during the effect, so
   // the route change and the close are not the same render.
   useEffect(() => {
-    const frame = requestAnimationFrame(() => setOpen(false));
+    const frame = requestAnimationFrame(() => {
+      setOpen(false);
+      setAccount(false);
+    });
     return () => cancelAnimationFrame(frame);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!account) return undefined;
+
+    const away = (event) => {
+      if (accountRef.current && !accountRef.current.contains(event.target)) {
+        setAccount(false);
+      }
+    };
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, [account]);
+
+  // Signing out drops the token, so the pages that need one show their signed
+  // out state again by themselves. Home is where it lands: the garage would
+  // only greet somebody who just left with an invitation to sign back in.
+  const leave = () => {
+    signOut();
+    setAccount(false);
+    setOpen(false);
+    navigate("/");
+  };
 
   // Nothing behind the drawer should scroll while it is over the top.
   useEffect(() => {
@@ -85,12 +120,73 @@ export default function NavBar() {
           </nav>
 
           <div className="hidden items-center gap-4 lg:flex">
-            <Link
-              to={user ? "/garage" : "/account"}
-              className="text-[14px] text-fog transition-colors hover:text-chalk"
-            >
-              {user ? user.name || "Garage" : "Sign in"}
-            </Link>
+            {/* Signed in, this used to be a bare link to the garage, which
+                meant /account was unreachable and the sign out button living
+                on it could not be got to at all. */}
+            {user ? (
+              <div ref={accountRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setAccount((was) => !was)}
+                  aria-expanded={account}
+                  className="flex items-center gap-2 text-[14px] text-fog transition-colors hover:text-chalk"
+                >
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full border border-line bg-panel text-[11px] text-chalk">
+                    {(user.name || user.email || "?").trim().charAt(0).toUpperCase()}
+                  </span>
+                  <span className="max-w-[120px] truncate">
+                    {user.name || user.email}
+                  </span>
+                </button>
+
+                <AnimatePresence>
+                  {account && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.18 }}
+                      className="panel absolute right-0 z-50 mt-3 w-56 p-2"
+                    >
+                      <p className="px-3 pt-2 pb-1 text-xs text-fog">
+                        Signed in as
+                      </p>
+                      <p className="truncate px-3 pb-2 text-sm text-chalk">
+                        {user.email}
+                      </p>
+
+                      <div className="tick-rule-dense mx-3 opacity-60" />
+
+                      {ACCOUNT_LINKS.map((entry) => (
+                        <Link
+                          key={entry.to}
+                          to={entry.to}
+                          className="block rounded-lg px-3 py-2 text-sm text-fog transition-colors hover:bg-raised hover:text-chalk"
+                        >
+                          {entry.label}
+                        </Link>
+                      ))}
+
+                      <button
+                        type="button"
+                        onClick={leave}
+                        className="block w-full rounded-lg px-3 py-2 text-left text-sm text-fog transition-colors hover:bg-raised hover:text-signal"
+                      >
+                        Sign out
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <Link
+                to="/account"
+                className="text-[14px] text-fog transition-colors hover:text-chalk"
+              >
+                Sign in
+              </Link>
+            )}
+
             <Link to="/customise" className="btn btn-signal">
               Start building
             </Link>
@@ -138,7 +234,7 @@ export default function NavBar() {
           >
             <div className="aurora opacity-25" />
 
-            <nav className="relative flex h-full flex-col overflow-y-auto px-6 pt-24 pb-10">
+            <nav className="relative flex h-full flex-col overflow-y-auto px-6 pt-20 pb-6">
               {SECTIONS.map((section, index) => (
                 <motion.div
                   key={section.to}
@@ -150,13 +246,13 @@ export default function NavBar() {
                     to={section.to}
                     className={({ isActive }) =>
                       [
-                        "block border-b border-white/8 py-5",
+                        "block border-b border-white/8 py-4",
                         isActive ? "text-signal" : "text-chalk"
                       ].join(" ")
                     }
                   >
                     <span className="flex items-baseline justify-between gap-4">
-                      <span className="text-[26px] font-semibold tracking-tight">
+                      <span className="text-[22px] font-semibold tracking-tight">
                         {section.label}
                       </span>
                       <span className="label shrink-0">{`0${index + 1}`}</span>
@@ -170,14 +266,33 @@ export default function NavBar() {
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.38, duration: 0.3 }}
-                className="mt-auto flex flex-col gap-3 pt-10"
+                className="mt-auto flex flex-col gap-2.5 pt-6"
               >
                 <Link to="/customise" className="btn btn-signal w-full">
                   Start building
                 </Link>
-                <Link to={user ? "/garage" : "/account"} className="btn btn-ghost w-full">
-                  {user ? user.name || "My garage" : "Sign in"}
-                </Link>
+
+                {user ? (
+                  <>
+                    <p className="truncate text-center text-xs text-fog">
+                      Signed in as {user.email}
+                    </p>
+                    <div className="flex gap-3">
+                      {ACCOUNT_LINKS.map((entry) => (
+                        <Link key={entry.to} to={entry.to} className="btn btn-ghost flex-1">
+                          {entry.short}
+                        </Link>
+                      ))}
+                    </div>
+                    <button type="button" onClick={leave} className="btn btn-ghost w-full">
+                      Sign out
+                    </button>
+                  </>
+                ) : (
+                  <Link to="/account" className="btn btn-ghost w-full">
+                    Sign in
+                  </Link>
+                )}
               </motion.div>
             </nav>
           </motion.div>

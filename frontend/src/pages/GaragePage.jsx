@@ -7,6 +7,7 @@ import { describeError } from "../lib/api";
 import { cars } from "../data/cars";
 import { formatRupees } from "../data/accessories";
 import { recentlyViewed } from "../lib/recent";
+import PageHeader from "../components/layout/PageHeader";
 
 export default function GaragePage() {
   const { user, checking, authHeader } = useAuth();
@@ -43,18 +44,16 @@ export default function GaragePage() {
   };
 
   return (
-    <div className="mx-auto max-w-[1500px] px-5 py-14 md:px-8">
+    <div className="mx-auto max-w-[1500px] px-5 pt-7 pb-10 md:px-8">
 
-      <header>
-        <p className="label">07 / Garage</p>
-        <h1 className="mt-4 text-4xl font-semibold tracking-tight md:text-5xl">
-          Everything you have saved.
-        </h1>
-        <div className="tick-rule mt-8 opacity-70" />
-      </header>
+      <PageHeader
+        section="Garage"
+        title="Everything you have saved"
+        summary="Builds you kept, and cars you looked at recently. Open one to carry on where you left off."
+      />
 
       {/* SAVED BUILDS */}
-      <section className="mt-12">
+      <section className="mt-6">
         {!user && !checking && (
           <div className="grid-veil border border-line-soft p-10 text-center">
             <p className="label">Not signed in</p>
@@ -159,7 +158,7 @@ export default function GaragePage() {
 
       {/* RECENTLY VIEWED, WHICH NEEDS NO ACCOUNT */}
       {recent.length > 0 && (
-        <section className="mt-16">
+        <section className="mt-10">
           <p className="label">Recently viewed</p>
           <p className="mt-2 text-xs text-fog">
             Kept on this device only. Nothing about this is sent anywhere.

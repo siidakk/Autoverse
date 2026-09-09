@@ -174,11 +174,11 @@ export default function HomePage() {
           {/* Type has to stay readable over whatever colour the car is. Dark
               from the bottom on a phone, where the car sits behind the words;
               dark from the left on a wide screen, where it sits beside them. */}
-          <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-ink via-ink/75 to-transparent md:bg-gradient-to-r md:from-ink md:via-ink/55 md:to-transparent" />
+          <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-ink via-ink/90 to-ink/45 md:bg-gradient-to-r md:from-ink md:via-ink/55 md:to-transparent" />
 
           <HeroLoader />
 
-          <div className="relative z-20 flex min-h-[100svh] flex-col justify-center py-24">
+          <div className="relative z-20 flex min-h-[100svh] flex-col justify-center py-10 md:py-20 md:[@media(max-height:800px)]:py-10">
             <motion.div
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
@@ -192,7 +192,7 @@ export default function HomePage() {
               <span className="label text-fog">Live in your browser · no install</span>
             </motion.div>
 
-            <h1 className="mt-7 max-w-3xl text-[clamp(2.75rem,8vw,5.75rem)] leading-[0.92] font-semibold tracking-tight">
+            <h1 className="mt-6 max-w-3xl text-[clamp(2.75rem,8vw,5.75rem)] leading-[0.92] font-semibold tracking-tight [@media(max-height:800px)]:text-[clamp(2.25rem,5vw,3.75rem)]">
               {["See your car", "before you", "change a thing."].map((line, i) => (
                 <motion.span
                   key={line}
@@ -212,21 +212,28 @@ export default function HomePage() {
               ))}
             </h1>
 
+            {/* What the site is, in the words somebody would use to describe
+                their own problem. The line that was here -- "fitted to a real
+                3D model by measuring the car itself" -- answers how it is
+                built, which is only interesting once you know what it is. */}
             <motion.p
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.42 }}
-              className="mt-8 max-w-xl text-lg leading-relaxed text-fog"
+              className="mt-6 max-w-xl text-base leading-relaxed text-fog md:mt-7 md:text-lg"
             >
-              Wheels, stance, paint, exhaust — fitted to a real 3D model by
-              measuring the car itself. Not a picture of a car like yours. Yours.
+              Five free tools for anyone buying, selling or modifying a car in
+              India.
+              <span className="mt-2 block text-fog/80">
+                No sign-up, nothing to install, and photos never leave your phone.
+              </span>
             </motion.p>
 
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.5 }}
-              className="mt-10 flex flex-wrap gap-3"
+              className="mt-7 flex flex-wrap gap-3"
             >
               <Link to="/customise" className="btn btn-signal">
                 Start building
@@ -236,12 +243,43 @@ export default function HomePage() {
               </Link>
             </motion.div>
 
+            {/* WHAT YOU CAN DO, WITHOUT SCROLLING FOR IT
+                These five had only ever appeared below the hero, the marquee
+                and a section heading -- so on a phone, where the hero is the
+                whole screen, the first view of this site listed none of the
+                things it does. The full cards are still further down; this is
+                the same five, small enough to sit here. */}
+            <motion.nav
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.6 }}
+              className="mt-7 grid max-w-3xl grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5"
+            >
+              {SECTIONS.map((section) => (
+                <Link
+                  key={section.to}
+                  to={section.to}
+                  className="group rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2.5 backdrop-blur-sm transition-colors hover:border-signal/50 hover:bg-white/[0.06]"
+                >
+                  <span className="flex items-center gap-1.5 text-[13px] font-medium text-chalk">
+                    {section.label}
+                    <span className="text-signal opacity-0 transition-all duration-300 group-hover:translate-x-0.5 group-hover:opacity-100">
+                      →
+                    </span>
+                  </span>
+                  <span className="mt-0.5 block text-[11px] leading-snug text-fog">
+                    {section.short}
+                  </span>
+                </Link>
+              ))}
+            </motion.nav>
+
             {/* WHICH CAR IS ON SCREEN */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.7 }}
-              className="mt-14"
+              className="mt-8 hidden md:[@media(min-height:820px)]:block"
             >
               <p className="label mb-3">Now showing</p>
 

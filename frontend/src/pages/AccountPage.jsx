@@ -37,13 +37,17 @@ export default function AccountPage() {
 
   if (user) {
     return (
-      <div className="mx-auto max-w-[600px] px-5 py-20 md:px-8">
-        <p className="label">06 / Account</p>
-        <h1 className="mt-4 text-3xl font-semibold tracking-tight">
+      <div className="mx-auto max-w-[600px] px-5 py-14 md:px-8">
+        <p className="label">Account</p>
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl">
           Signed in as {user.name || user.email}
         </h1>
+        <p className="mt-3 text-sm leading-relaxed text-fog">
+          Your saved builds live in the garage. Everything else on the site
+          works whether you are signed in or not.
+        </p>
 
-        <div className="panel mt-8 p-6">
+        <div className="panel mt-6 p-6">
           <dl className="space-y-3 text-sm">
             <div className="flex justify-between">
               <dt className="text-fog">Email</dt>
@@ -71,17 +75,18 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[600px] px-5 py-20 md:px-8">
-      <p className="label">06 / Account</p>
-      <h1 className="mt-4 text-3xl font-semibold tracking-tight">
+    <div className="mx-auto max-w-[600px] px-5 py-14 md:px-8">
+      <p className="label">Account</p>
+      <h1 className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl">
         {mode === "login" ? "Sign in" : "Make an account"}
       </h1>
-      <p className="mt-4 text-sm leading-relaxed text-fog">
-        Builds already save without one, and a share code will always reopen a
-        build. An account is for keeping them together in one place.
+      <p className="mt-3 text-sm leading-relaxed text-fog">
+        You do not need one. Every tool on this site works signed out, builds
+        save without an account, and a share code will always reopen one. An
+        account only keeps your builds together in one place.
       </p>
 
-      <form onSubmit={submit} className="panel mt-8 space-y-5 p-6">
+      <form onSubmit={submit} className="panel mt-6 space-y-5 p-6">
         {mode === "register" && (
           <label className="block">
             <span className="label">Name, if you like</span>
