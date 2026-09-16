@@ -5,6 +5,7 @@ import {
   boundsOf
 } from "./wheelDetection";
 import { detectLights as detectLightsIn } from "./lightDetection";
+import { facingSign } from "../data/carFacing";
 
 // Turns a loaded glTF scene into the plain part list the detection algorithm
 // works on. The algorithm itself lives in wheelDetection.js so the command line
@@ -47,12 +48,22 @@ function partsFromScene(scene) {
   return parts;
 }
 
-export function inspectCar(scene) {
+export function inspectCar(scene, model = null) {
   const parts = partsFromScene(scene);
   const measurement = measureCar(parts);
   if (!measurement) return null;
 
-  return { ...measurement, parts };
+  // Which end is the back is measured, and on one model the measurement is
+  // wrong in a way no rule fixes without breaking three others. See
+  // data/carFacing.js -- every fitted part is placed from this number, so
+  // getting it wrong puts all of them at the wrong end of the car.
+  const override = model ? facingSign(model) : null;
+
+  return {
+    ...measurement,
+    rearSign: override ?? measurement.rearSign,
+    parts
+  };
 }
 
 export function detectWheels(car) {

@@ -46,7 +46,7 @@ export default function CarModel({
   const clonedFor = useRef(null);
 
   const measurements = useMemo(() => {
-    const measured = inspectCar(scene);
+    const measured = inspectCar(scene, modelPath);
     if (!measured) return null;
 
     return {
@@ -54,7 +54,7 @@ export default function CarModel({
       wheels: detectWheels(measured),
       lights: detectLights(measured)
     };
-  }, [scene]);
+  }, [scene, modelPath]);
 
   const fit = useMemo(() => {
     if (!measurements) return { scale: 1, position: [0, 0, 0] };

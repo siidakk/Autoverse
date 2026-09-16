@@ -29,13 +29,15 @@ function measureDeck(scene, car, spanWidth, chordOffset) {
     // Walk forward from the tail until the ray lands on a panel, which keeps
     // the ends of the spoiler on the car where the rear tapers away.
     let height = null;
+    let offset = chordOffset;
     for (const step of [0, 0.03, 0.06, 0.1, 0.15]) {
-      const along = rearEnd + rearSign * (chordOffset - length * step);
+      offset = chordOffset - length * step;
+      const along = rearEnd + rearSign * offset;
       height = sampleSurfaceHeight(scene, car, along, lateral);
       if (height !== null) break;
     }
 
-    sampled.push({ lateral, height });
+    sampled.push({ lateral, height, offset: height === null ? null : offset });
   }
 
   if (sampled.filter((point) => point.height !== null).length < 3) return null;
@@ -59,7 +61,21 @@ function measureDeck(scene, car, spanWidth, chordOffset) {
     return { lateral: point.lateral, height: nearest.height };
   });
 
-  return { rearEnd, points };
+  // Where along the car the panel actually turned up.
+  //
+  // This walk existed only to find a height, and the part was then drawn back
+  // at the bumper line regardless. On a car whose deck reaches the tail -- most
+  // of them -- those are the same place and nothing changes. On a box they are
+  // not: the G-Class roof stops 7% of the car short of the tailgate, so the
+  // wing was hung in the air behind the roof with its stands reaching down to
+  // nothing.
+  //
+  // The median resists the outer stations, which hang off the side of a narrow
+  // roof and have to walk furthest forward before they find anything.
+  const hits = sampled.map((point) => point.offset).filter((offset) => offset !== null).sort((a, b) => a - b);
+  const mountOffset = hits.length ? hits[Math.floor(hits.length / 2)] : chordOffset;
+
+  return { rearEnd, points, mountOffset };
 }
 
 export default function Spoiler({ type, car, scene, track }) {
@@ -78,7 +94,7 @@ export default function Spoiler({ type, car, scene, track }) {
     if (!deck) return null;
 
     const { lengthAxis, widthAxis, rearSign, length } = car;
-    const { rearEnd, points } = deck;
+    const { rearEnd, points, mountOffset } = deck;
 
     const isWing = type === "racing";
 
@@ -101,7 +117,7 @@ export default function Spoiler({ type, car, scene, track }) {
       return {
         lateral: point.lateral,
         baseY: isWing ? deckPeak + standHeight : point.height,
-        chordOffset,
+        chordOffset: mountOffset,
         // Both shapes taper towards their tips so nothing ends in a blunt slab.
         scale: isWing ? 1 : 0.35 + 0.65 * Math.min(1, fromEdge / 2)
       };
@@ -121,6 +137,7 @@ export default function Spoiler({ type, car, scene, track }) {
       standHeight,
       deckPeak,
       rearEnd,
+      mountOffset,
       points
     };
   }, [enabled, scene, car, type, spanWidth, chordOffset]);
@@ -128,7 +145,7 @@ export default function Spoiler({ type, car, scene, track }) {
   if (!built) return null;
 
   const { lengthAxis, widthAxis, rearSign, length } = car;
-  const { geometry, isWing, chord, standHeight, deckPeak, rearEnd, points } = built;
+  const { geometry, isWing, chord, standHeight, deckPeak, rearEnd, mountOffset, points } = built;
 
   const place = (along, up, lateral) => {
     const position = [0, up, 0];
@@ -173,7 +190,7 @@ export default function Spoiler({ type, car, scene, track }) {
               <mesh
                 key={lateral}
                 position={place(
-                  chordOffset - chord * 0.35,
+                  mountOffset - chord * 0.35,
                   (top + bottom) / 2,
                   lateral
                 )}
@@ -195,7 +212,7 @@ export default function Spoiler({ type, car, scene, track }) {
             <mesh
               key={lateral}
               position={place(
-                chordOffset - chord * 0.45,
+                mountOffset - chord * 0.45,
                 deckPeak + standHeight + chord * 0.05,
                 lateral
               )}

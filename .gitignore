@@ -54,3 +54,7 @@ frontend/public/__test-car.png
 frontend/public/__test-car-small.jpg
 frontend/public/__test-fortuner.jpg
 frontend/public/__test-gclass.jpg
+
+# Renders from tools/shoot-configurator.mjs, for looking at a change rather
+# than shipping it.
+shots/
